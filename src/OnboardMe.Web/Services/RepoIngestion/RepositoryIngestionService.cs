@@ -8,6 +8,8 @@ namespace OnboardMe.Web.Services.RepoIngestion;
 public sealed class RepositoryIngestionService(
     IHttpClientFactory httpClientFactory,
     IRepositoryIndexingStatusStore statusStore,
+    IAzureOpenAiEmbeddingService embeddingService,
+    IRepositoryEmbeddingStore embeddingStore,
     ILogger<RepositoryIngestionService> logger) : IRepositoryIngestionService
 {
     public const string GitHubApiClientName = "GitHubApi";
@@ -96,9 +98,28 @@ public sealed class RepositoryIngestionService(
                 status.Files.Add(file);
             }
 
+            var chunks = status.Files
+                .Where(file => file.Status == RepositoryFileIndexStatus.Indexed)
+                .SelectMany(file => file.Chunks)
+                .ToArray();
+
+            try
+            {
+                var embeddings = await embeddingService.GenerateEmbeddingsAsync(owner, repository, chunks, cancellationToken);
+                await embeddingStore.ReplaceRepositoryEmbeddingsAsync(owner, repository, embeddings, cancellationToken);
+                status.EmbeddedChunkCount = embeddings.Count;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Embedding generation failed for {Owner}/{Repository}", owner, repository);
+                status.ErrorMessage = string.IsNullOrWhiteSpace(status.ErrorMessage)
+                    ? $"Embedding generation failed: {ex.Message}"
+                    : $"{status.ErrorMessage} | Embedding generation failed: {ex.Message}";
+            }
+
             status.CompletedAtUtc = DateTimeOffset.UtcNow;
             status.State = RepositoryIndexingState.Completed;
-            if (status.FailedCount > 0)
+            if (status.FailedCount > 0 || !string.IsNullOrWhiteSpace(status.ErrorMessage))
             {
                 status.State = RepositoryIndexingState.CompletedWithErrors;
             }
@@ -119,6 +140,23 @@ public sealed class RepositoryIngestionService(
 
     public Task<RepositoryIndexingStatus?> GetLatestStatusAsync(string owner, string repository, CancellationToken cancellationToken = default)
         => statusStore.GetAsync(owner, repository, cancellationToken);
+
+    public async Task<int> RegenerateEmbeddingsAsync(string owner, string repository, CancellationToken cancellationToken = default)
+    {
+        var status = await statusStore.GetAsync(owner, repository, cancellationToken)
+            ?? throw new InvalidOperationException($"No repository status found for {owner}/{repository}.");
+
+        var chunks = status.Files
+            .Where(file => file.Status == RepositoryFileIndexStatus.Indexed)
+            .SelectMany(file => file.Chunks)
+            .ToArray();
+
+        var embeddings = await embeddingService.GenerateEmbeddingsAsync(owner, repository, chunks, cancellationToken);
+        await embeddingStore.ReplaceRepositoryEmbeddingsAsync(owner, repository, embeddings, cancellationToken);
+        status.EmbeddedChunkCount = embeddings.Count;
+        await statusStore.SaveAsync(status, cancellationToken);
+        return embeddings.Count;
+    }
 
     private static async Task<GitHubRepositoryMetadata> GetRepositoryMetadataAsync(HttpClient client, string owner, string repository, CancellationToken cancellationToken)
     {

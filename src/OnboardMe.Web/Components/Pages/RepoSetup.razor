@@ -77,7 +77,7 @@
             return;
         }
 
-        successMessage = $"Indexed {status.IndexedCount} files, skipped {status.SkippedCount}, failed {status.FailedCount}.";
+        successMessage = $"Indexed {status.IndexedCount} files, skipped {status.SkippedCount}, failed {status.FailedCount}, embedded {status.EmbeddedChunkCount} chunks.";
         formModel.RepositoryUrl = normalizedUrl;
     }
 

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using OnboardMe.Web.Services.RepoIngestion;
 
 namespace OnboardMe.Web.Tests;
@@ -41,6 +42,22 @@ public class RepositoryIngestionServiceTests
                 };
             }
 
+            if (request.Method == HttpMethod.Post
+                && string.Equals(request.RequestUri?.AbsoluteUri, "https://aoai.test/openai/deployments/embeddings-test/embeddings?api-version=2024-02-01", StringComparison.Ordinal))
+            {
+                return JsonResponse(new
+                {
+                    data = new[]
+                    {
+                        new
+                        {
+                            index = 0,
+                            embedding = new[] { 0.11f, 0.22f, 0.33f }
+                        }
+                    }
+                });
+            }
+
             return new HttpResponseMessage(HttpStatusCode.NotFound);
         });
 
@@ -52,6 +69,17 @@ public class RepositoryIngestionServiceTests
         var service = new RepositoryIngestionService(
             new StubHttpClientFactory(httpClient),
             new InMemoryRepositoryIndexingStatusStore(),
+            new AzureOpenAiEmbeddingService(
+                new StubHttpClientFactory(httpClient),
+                Options.Create(new AzureOpenAiEmbeddingsOptions
+                {
+                    Endpoint = "https://aoai.test/",
+                    ApiKey = "local-test-key",
+                    EmbeddingsDeployment = "embeddings-test",
+                    ApiVersion = "2024-02-01"
+                }),
+                NullLogger<AzureOpenAiEmbeddingService>.Instance),
+            new InMemoryRepositoryEmbeddingStore(),
             NullLogger<RepositoryIngestionService>.Instance);
 
         var result = await service.IngestRepositoryAsync("octocat", "hello-world");
@@ -60,6 +88,7 @@ public class RepositoryIngestionServiceTests
         Assert.Equal(1, result.IndexedCount);
         Assert.Equal(3, result.SkippedCount);
         Assert.Equal(0, result.FailedCount);
+        Assert.Equal(1, result.EmbeddedChunkCount);
 
         var indexedFile = Assert.Single(result.Files, file => file.Status == RepositoryFileIndexStatus.Indexed);
         Assert.Equal("src/App.cs", indexedFile.Path);
@@ -71,6 +100,86 @@ public class RepositoryIngestionServiceTests
         Assert.Equal(1, chunk.StartLine);
         Assert.Equal(1, chunk.EndLine);
         Assert.Equal("public class App {}", chunk.Content);
+    }
+
+    [Fact]
+    public async Task RegenerateEmbeddingsAsync_RebuildsEmbeddingsForIndexedRepository()
+    {
+        var embeddingCalls = 0;
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var pathAndQuery = request.RequestUri?.PathAndQuery ?? string.Empty;
+
+            if (request.Method == HttpMethod.Get && pathAndQuery == "/repos/octocat/hello-world")
+            {
+                return JsonResponse(new { default_branch = "main" });
+            }
+
+            if (request.Method == HttpMethod.Get && pathAndQuery == "/repos/octocat/hello-world/git/trees/main?recursive=1")
+            {
+                return JsonResponse(new
+                {
+                    tree = new[]
+                    {
+                        new { path = "src/App.cs", type = "blob", sha = "sha-app", size = 50 }
+                    }
+                });
+            }
+
+            if (request.Method == HttpMethod.Get && pathAndQuery == "/repos/octocat/hello-world/git/blobs/sha-app")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("public class App {}")
+                };
+            }
+
+            if (request.Method == HttpMethod.Post
+                && string.Equals(request.RequestUri?.AbsoluteUri, "https://aoai.test/openai/deployments/embeddings-test/embeddings?api-version=2024-02-01", StringComparison.Ordinal))
+            {
+                embeddingCalls++;
+                return JsonResponse(new
+                {
+                    data = new[]
+                    {
+                        new
+                        {
+                            index = 0,
+                            embedding = new[] { 0.11f, 0.22f, 0.33f }
+                        }
+                    }
+                });
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.github.com/")
+        };
+
+        var service = new RepositoryIngestionService(
+            new StubHttpClientFactory(httpClient),
+            new InMemoryRepositoryIndexingStatusStore(),
+            new AzureOpenAiEmbeddingService(
+                new StubHttpClientFactory(httpClient),
+                Options.Create(new AzureOpenAiEmbeddingsOptions
+                {
+                    Endpoint = "https://aoai.test/",
+                    ApiKey = "local-test-key",
+                    EmbeddingsDeployment = "embeddings-test",
+                    ApiVersion = "2024-02-01"
+                }),
+                NullLogger<AzureOpenAiEmbeddingService>.Instance),
+            new InMemoryRepositoryEmbeddingStore(),
+            NullLogger<RepositoryIngestionService>.Instance);
+
+        await service.IngestRepositoryAsync("octocat", "hello-world");
+        var embeddedCount = await service.RegenerateEmbeddingsAsync("octocat", "hello-world");
+
+        Assert.Equal(1, embeddedCount);
+        Assert.Equal(2, embeddingCalls);
     }
 
     private static HttpResponseMessage JsonResponse<T>(T payload)

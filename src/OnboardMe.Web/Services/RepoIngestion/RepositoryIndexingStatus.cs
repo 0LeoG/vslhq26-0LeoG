@@ -18,6 +18,8 @@ public sealed class RepositoryIndexingStatus
 
     public List<RepositoryFileIngestionRecord> Files { get; } = [];
 
+    public int EmbeddedChunkCount { get; set; }
+
     public int IndexedCount => Files.Count(file => file.Status == RepositoryFileIndexStatus.Indexed);
 
     public int SkippedCount => Files.Count(file => file.Status == RepositoryFileIndexStatus.Skipped);

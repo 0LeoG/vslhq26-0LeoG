@@ -28,7 +28,11 @@ builder.Services.AddHttpClient(RepositoryIngestionService.GitHubApiClientName, c
     client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(AppUserAgentProductName, AppUserAgentProductVersion));
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
 });
+builder.Services.AddHttpClient(AzureOpenAiEmbeddingService.AzureOpenAiClientName);
+builder.Services.Configure<AzureOpenAiEmbeddingsOptions>(builder.Configuration.GetSection(AzureOpenAiEmbeddingsOptions.SectionName));
 builder.Services.AddSingleton<IRepositoryIndexingStatusStore, InMemoryRepositoryIndexingStatusStore>();
+builder.Services.AddSingleton<IRepositoryEmbeddingStore, InMemoryRepositoryEmbeddingStore>();
+builder.Services.AddSingleton<IAzureOpenAiEmbeddingService, AzureOpenAiEmbeddingService>();
 builder.Services.AddSingleton<IRepositoryIngestionService, RepositoryIngestionService>();
 
 var githubClientId = builder.Configuration[GitHubClientIdConfigKey];
@@ -122,6 +126,23 @@ app.MapGet("/auth/signout", (string? returnUrl) =>
     return Results.SignOut(
         new AuthenticationProperties { RedirectUri = redirectUri },
         authenticationSchemes: [CookieAuthenticationDefaults.AuthenticationScheme]);
+});
+
+app.MapPost("/repos/{owner}/{repository}/embeddings/rerun", async (
+    string owner,
+    string repository,
+    IRepositoryIngestionService repositoryIngestionService,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var embeddedChunks = await repositoryIngestionService.RegenerateEmbeddingsAsync(owner, repository, cancellationToken);
+        return Results.Ok(new { owner, repository, embeddedChunks });
+    }
+    catch (InvalidOperationException ex)
+    {
+        return Results.NotFound(new { message = ex.Message });
+    }
 });
 
 app.MapStaticAssets();

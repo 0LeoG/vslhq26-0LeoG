@@ -106,6 +106,7 @@ dotnet user-secrets set "AzureOpenAI:Endpoint" "https://your-resource.openai.azu
 dotnet user-secrets set "AzureOpenAI:ApiKey" "your-azure-openai-api-key" --project src/OnboardMe.Web/OnboardMe.Web.csproj
 dotnet user-secrets set "AzureOpenAI:ChatDeployment" "your-chat-deployment" --project src/OnboardMe.Web/OnboardMe.Web.csproj
 dotnet user-secrets set "AzureOpenAI:EmbeddingsDeployment" "your-embeddings-deployment" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+dotnet user-secrets set "AzureOpenAI:ApiVersion" "2024-02-01" --project src/OnboardMe.Web/OnboardMe.Web.csproj
 
 # Optional: add vector index settings locally
 dotnet user-secrets set "VectorIndex:Provider" "your-vector-provider" --project src/OnboardMe.Web/OnboardMe.Web.csproj
@@ -141,6 +142,12 @@ For local development, prefer `.NET user secrets`:
 - Inspect local secrets with `dotnet user-secrets list --project src/OnboardMe.Web/OnboardMe.Web.csproj`.
 
 For GitHub OAuth, configure your app callback URL to `https://localhost:<port>/signin-github` (or your configured callback path).
+
+To re-run embeddings for a previously indexed repository, call:
+
+```bash
+curl -X POST https://localhost:<port>/repos/<owner>/<repo>/embeddings/rerun
+```
 
 ## Demo (required)
 
