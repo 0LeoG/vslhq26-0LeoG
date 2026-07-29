@@ -15,12 +15,12 @@
         </p>
 
         <p class="mt-4">Enter a GitHub repository URL to continue.</p>
-        <EditForm OnSubmit="ConnectRepository">
+        <EditForm Model="formModel" OnSubmit="ConnectRepository">
             <div class="mb-3">
                 <label class="form-label" for="repo-url">Repository URL</label>
                 <InputText id="repo-url"
                            class="form-control"
-                           @bind-Value="repositoryUrl"
+                           @bind-Value="formModel.RepositoryUrl"
                            placeholder="https://github.com/owner/repo" />
                 <div class="form-text">Only root GitHub repository links are supported for now.</div>
             </div>
@@ -48,7 +48,7 @@
 </AuthorizeView>
 
 @code {
-    private string? repositoryUrl;
+    private readonly RepositoryFormModel formModel = new();
     private string? errorMessage;
     private string? successMessage;
 
@@ -57,14 +57,19 @@
         errorMessage = null;
         successMessage = null;
 
-        if (!TryNormalizeGitHubRepositoryUrl(repositoryUrl, out var normalizedUrl, out var validationError))
+        if (!TryNormalizeGitHubRepositoryUrl(formModel.RepositoryUrl, out var normalizedUrl, out var validationError))
         {
             errorMessage = validationError;
             return;
         }
 
         successMessage = $"Repository URL validated: {normalizedUrl}";
-        repositoryUrl = normalizedUrl;
+        formModel.RepositoryUrl = normalizedUrl;
+    }
+
+    private sealed class RepositoryFormModel
+    {
+        public string? RepositoryUrl { get; set; }
     }
 
     private static bool TryNormalizeGitHubRepositoryUrl(string? input, out string normalizedUrl, out string errorMessage)
