@@ -18,5 +18,8 @@ public sealed class InMemoryRepositoryIndexingStatusStore : IRepositoryIndexingS
         return Task.FromResult(status);
     }
 
+    public Task<IReadOnlyList<RepositoryIndexingStatus>> ListAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<RepositoryIndexingStatus>>(statuses.Values.ToArray());
+
     private static string BuildKey(string owner, string repository) => $"{owner}/{repository}";
 }

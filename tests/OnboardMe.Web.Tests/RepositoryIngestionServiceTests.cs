@@ -392,5 +392,8 @@ public class RepositoryIngestionServiceTests
 
         public Task<RepositoryIndexingStatus?> GetAsync(string owner, string repository, CancellationToken cancellationToken = default)
             => Task.FromResult<RepositoryIndexingStatus?>(snapshots.LastOrDefault());
+
+        public Task<IReadOnlyList<RepositoryIndexingStatus>> ListAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<RepositoryIndexingStatus>>(snapshots);
     }
 }
