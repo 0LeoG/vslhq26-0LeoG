@@ -20,6 +20,14 @@ public sealed class RepositoryIndexingStatus
 
     public int EmbeddedChunkCount { get; set; }
 
+    public int TotalFileCount { get; set; }
+
+    public int ProcessedFileCount { get; set; }
+
+    public int ProcessedChunkCount { get; set; }
+
+    public string? CurrentFilePath { get; set; }
+
     public int IndexedCount => Files.Count(file => file.Status == RepositoryFileIndexStatus.Indexed);
 
     public int SkippedCount => Files.Count(file => file.Status == RepositoryFileIndexStatus.Skipped);

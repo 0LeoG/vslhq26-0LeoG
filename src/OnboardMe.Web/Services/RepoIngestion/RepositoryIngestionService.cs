@@ -41,14 +41,28 @@ public sealed class RepositoryIngestionService(
             status.Branch = repositoryMetadata.DefaultBranch;
 
             var tree = await GetRepositoryTreeAsync(client, owner, repository, repositoryMetadata.DefaultBranch, cancellationToken);
+            var filesToProcess = tree
+                .Where(treeItem => string.Equals(treeItem.Type, "blob", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            status.TotalFileCount = filesToProcess.Length;
+            await statusStore.SaveAsync(status, cancellationToken);
 
-            foreach (var item in tree.Where(treeItem => string.Equals(treeItem.Type, "blob", StringComparison.OrdinalIgnoreCase)))
+            foreach (var item in filesToProcess)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var path = item.Path;
                 var extension = Path.GetExtension(path);
                 var size = item.Size ?? 0;
+                status.CurrentFilePath = path;
+
+                async Task MarkFileProcessedAsync(RepositoryFileIngestionRecord processedFile)
+                {
+                    status.Files.Add(processedFile);
+                    status.ProcessedFileCount++;
+                    status.ProcessedChunkCount += processedFile.Chunks.Count;
+                    await statusStore.SaveAsync(status, cancellationToken);
+                }
 
                 var file = new RepositoryFileIngestionRecord
                 {
@@ -64,7 +78,7 @@ public sealed class RepositoryIngestionService(
                 {
                     file.Status = RepositoryFileIndexStatus.Skipped;
                     file.SkipReason = "generated-path";
-                    status.Files.Add(file);
+                    await MarkFileProcessedAsync(file);
                     continue;
                 }
 
@@ -72,7 +86,7 @@ public sealed class RepositoryIngestionService(
                 {
                     file.Status = RepositoryFileIndexStatus.Skipped;
                     file.SkipReason = "binary-file";
-                    status.Files.Add(file);
+                    await MarkFileProcessedAsync(file);
                     continue;
                 }
 
@@ -80,7 +94,7 @@ public sealed class RepositoryIngestionService(
                 {
                     file.Status = RepositoryFileIndexStatus.Skipped;
                     file.SkipReason = "oversized-file";
-                    status.Files.Add(file);
+                    await MarkFileProcessedAsync(file);
                     continue;
                 }
 
@@ -99,7 +113,7 @@ public sealed class RepositoryIngestionService(
                     file.ErrorMessage = ex.Message;
                 }
 
-                status.Files.Add(file);
+                await MarkFileProcessedAsync(file);
             }
 
             var chunks = status.Files
@@ -128,6 +142,7 @@ public sealed class RepositoryIngestionService(
                 status.State = RepositoryIndexingState.CompletedWithErrors;
             }
 
+            status.CurrentFilePath = null;
             await statusStore.SaveAsync(status, cancellationToken);
             return status;
         }
@@ -137,6 +152,7 @@ public sealed class RepositoryIngestionService(
             status.State = RepositoryIndexingState.Failed;
             status.ErrorMessage = ex.Message;
             status.CompletedAtUtc = DateTimeOffset.UtcNow;
+            status.CurrentFilePath = null;
             await statusStore.SaveAsync(status, cancellationToken);
             return status;
         }

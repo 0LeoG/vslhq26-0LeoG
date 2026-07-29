@@ -25,8 +25,29 @@
                            placeholder="https://github.com/owner/repo" />
                 <div class="form-text">Only root GitHub repository links are supported for now.</div>
             </div>
-            <button type="submit" class="btn btn-primary">Connect repository</button>
+            <button type="submit" class="btn btn-primary" disabled="@isIngestionRunning">
+                @(isIngestionRunning ? "Indexing repository..." : "Connect repository")
+            </button>
         </EditForm>
+
+        @if (isIngestionRunning)
+        {
+            <div class="mt-3">
+                <p class="mb-2">
+                    Indexing files and creating chunks...
+                    @if (!string.IsNullOrWhiteSpace(currentStatus?.CurrentFilePath))
+                    {
+                        <span class="text-muted">(@currentStatus.CurrentFilePath)</span>
+                    }
+                </p>
+                <div class="progress" role="progressbar" aria-label="Repository indexing progress" aria-valuenow="@ProgressPercent" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: @($"{ProgressPercent}%")">@ProgressPercent%</div>
+                </div>
+                <p class="form-text mt-2 mb-0">
+                    Processed @currentStatus?.ProcessedFileCount of @currentStatus?.TotalFileCount files. Created @currentStatus?.ProcessedChunkCount chunks.
+                </p>
+            </div>
+        }
 
         @if (!string.IsNullOrWhiteSpace(errorMessage))
         {
@@ -52,11 +73,17 @@
     private readonly RepositoryFormModel formModel = new();
     private string? errorMessage;
     private string? successMessage;
+    private bool isIngestionRunning;
+    private RepositoryIndexingStatus? currentStatus;
+    private int ProgressPercent => currentStatus?.TotalFileCount > 0
+        ? Math.Clamp((int)((double)currentStatus.ProcessedFileCount / currentStatus.TotalFileCount * 100), 0, 100)
+        : 0;
 
     private async Task ConnectRepository()
     {
         errorMessage = null;
         successMessage = null;
+        currentStatus = null;
 
         if (!TryNormalizeGitHubRepositoryUrl(formModel.RepositoryUrl, out var normalizedUrl, out var validationError))
         {
@@ -70,7 +97,33 @@
             return;
         }
 
-        var status = await RepositoryIngestionService.IngestRepositoryAsync(owner, repository);
+        isIngestionRunning = true;
+        StateHasChanged();
+
+        RepositoryIndexingStatus? status = null;
+        var ingestionTask = RepositoryIngestionService.IngestRepositoryAsync(owner, repository);
+        try
+        {
+            while (!ingestionTask.IsCompleted)
+            {
+                currentStatus = await RepositoryIngestionService.GetLatestStatusAsync(owner, repository);
+                StateHasChanged();
+                await Task.Delay(500);
+            }
+
+            status = await ingestionTask;
+            currentStatus = status;
+        }
+        finally
+        {
+            isIngestionRunning = false;
+        }
+        if (status is null)
+        {
+            errorMessage = "Repository ingestion failed unexpectedly.";
+            return;
+        }
+
         if (status.State == RepositoryIndexingState.Failed)
         {
             errorMessage = $"Repository ingestion failed: {status.ErrorMessage}";
