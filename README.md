@@ -61,6 +61,14 @@ Main planned components:
 - **AI models/services:** Azure OpenAI for embeddings and chat completions
 - **Hosting:** TBD
 
+## Solution structure
+
+```text
+onboard-me.sln
+src/
+  OnboardMe.Web/        # ASP.NET Core Blazor app
+```
+
 ## Getting started
 
 ### Prerequisites
@@ -81,13 +89,14 @@ git clone https://github.com/0LeoG/vslhq26-0LeoG.git
 cd vslhq26-0LeoG
 
 # Restore dependencies
-dotnet restore
+dotnet restore onboard-me.sln
 
-# Configure local settings
-# Add environment variables or user secrets for GitHub auth and Azure OpenAI
+# Configure local settings (shape only; do not commit real secrets)
+# See: src/OnboardMe.Web/appsettings.Example.json
+# You can use .NET user secrets or environment variables for sensitive values.
 
 # Run the app
-dotnet run
+dotnet run --project src/OnboardMe.Web/OnboardMe.Web.csproj
 ```
 
 ### Configuration
