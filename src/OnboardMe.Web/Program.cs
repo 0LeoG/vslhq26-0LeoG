@@ -123,7 +123,17 @@ app.Run();
 
 static string NormalizeReturnUrl(string? returnUrl)
 {
-    if (string.IsNullOrWhiteSpace(returnUrl) || !returnUrl.StartsWith('/') || returnUrl.StartsWith("//"))
+    if (string.IsNullOrWhiteSpace(returnUrl))
+    {
+        return "/repo-setup";
+    }
+
+    if (!Uri.TryCreate(returnUrl, UriKind.Relative, out _))
+    {
+        return "/repo-setup";
+    }
+
+    if (!returnUrl.StartsWith('/') || returnUrl.StartsWith("//") || returnUrl.StartsWith("/\\"))
     {
         return "/repo-setup";
     }
