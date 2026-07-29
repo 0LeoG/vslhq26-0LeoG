@@ -1,5 +1,6 @@
 @page "/chat"
 @rendermode InteractiveServer
+@implements IDisposable
 @inject IRepositoryIndexingStatusStore IndexingStatusStore
 @inject IAzureOpenAiEmbeddingService EmbeddingService
 @inject IRepositoryEmbeddingStore EmbeddingStore
@@ -29,11 +30,30 @@ else
             @foreach (var repo in indexedRepos)
             {
                 <option value="@($"{repo.Owner}/{repo.Repository}")" selected="@(selectedOwner == repo.Owner && selectedRepository == repo.Repository)">
-                    @repo.Owner/@repo.Repository
+                    @repo.Owner/@repo.Repository@(repo.State == RepositoryIndexingState.Running ? " (indexing...)" : string.Empty)
                 </option>
             }
         </select>
     </div>
+
+    @if (selectedRepositoryStatus?.State == RepositoryIndexingState.Running)
+    {
+        <div class="indexing-banner" role="status" aria-live="polite">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>Repository is still indexing in the background.</strong>
+                <span class="text-muted small">Answers may improve as more files are processed.</span>
+            </div>
+            <div class="progress" role="progressbar" aria-label="Repository indexing progress" aria-valuenow="@SelectedRepositoryProgressPercent" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: @($"{SelectedRepositoryProgressPercent}%")">
+                    @SelectedRepositoryProgressPercent%
+                </div>
+            </div>
+            <div class="form-text mt-2 mb-0">
+                Processed @selectedRepositoryStatus.ProcessedFileCount of @selectedRepositoryStatus.TotalFileCount files.
+                Embedded @selectedRepositoryStatus.EmbeddedChunkCount chunks.
+            </div>
+        </div>
+    }
 
     <div class="start-here-panel">
         <h2 class="h5 mb-2">Where should I start?</h2>
@@ -168,12 +188,17 @@ else
     private string selectedOwner = string.Empty;
     private string selectedRepository = string.Empty;
     private IReadOnlyList<RepositoryIndexingStatus> indexedRepos = [];
+    private RepositoryIndexingStatus? selectedRepositoryStatus;
     private readonly List<ChatMessageModel> messages = [];
     private readonly StartHereInputModel startHereInputModel = new();
     private IReadOnlyList<StartHereSuggestion> startHereSuggestions = [];
     private string? startHereMessage;
+    private CancellationTokenSource? statusPollingCts;
 
     private readonly ChatInputModel inputModel = new();
+    private int SelectedRepositoryProgressPercent => selectedRepositoryStatus?.TotalFileCount > 0
+        ? Math.Clamp((int)((double)selectedRepositoryStatus.ProcessedFileCount / selectedRepositoryStatus.TotalFileCount * 100), 0, 100)
+        : 0;
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -181,17 +206,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var all = await IndexingStatusStore.ListAsync();
-        indexedRepos = all
-            .Where(r => r.State is RepositoryIndexingState.Completed or RepositoryIndexingState.CompletedWithErrors)
-            .OrderBy(r => $"{r.Owner}/{r.Repository}", StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (indexedRepos.Count > 0)
-        {
-            selectedOwner = indexedRepos[0].Owner;
-            selectedRepository = indexedRepos[0].Repository;
-        }
+        await RefreshRepositoryStatusesAsync();
+        StartStatusPolling();
 
         hasLoadedState = true;
     }
@@ -209,6 +225,10 @@ else
             selectedOwner = value[..slash];
             selectedRepository = value[(slash + 1)..];
         }
+
+        selectedRepositoryStatus = indexedRepos.FirstOrDefault(repo =>
+            string.Equals(repo.Owner, selectedOwner, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(repo.Repository, selectedRepository, StringComparison.OrdinalIgnoreCase));
 
         // Clear conversation when the user switches repos.
         messages.Clear();
@@ -234,6 +254,14 @@ else
 
         try
         {
+            var currentEmbeddings = await EmbeddingStore.GetRepositoryEmbeddingsAsync(selectedOwner, selectedRepository);
+            if (currentEmbeddings.Count == 0)
+            {
+                placeholder.IsLoading = false;
+                placeholder.ErrorMessage = "No embeddings are available yet for this repository. Wait for indexing progress and try again.";
+                return;
+            }
+
             // Step 1: embed the question.
             var queryChunk = new RepositoryContentChunk
             {
@@ -274,6 +302,68 @@ else
             isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private void StartStatusPolling()
+    {
+        statusPollingCts?.Cancel();
+        statusPollingCts?.Dispose();
+        statusPollingCts = new CancellationTokenSource();
+        var cancellationToken = statusPollingCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    await RefreshRepositoryStatusesAsync();
+                    await InvokeAsync(StateHasChanged);
+                    await Task.Delay(1000, cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal cancellation on page disposal.
+            }
+        }, cancellationToken);
+    }
+
+    private async Task RefreshRepositoryStatusesAsync()
+    {
+        var all = await IndexingStatusStore.ListAsync();
+        indexedRepos = all
+            .Where(r => r.State is not RepositoryIndexingState.Failed)
+            .OrderBy(r => $"{r.Owner}/{r.Repository}", StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (indexedRepos.Count == 0)
+        {
+            selectedOwner = string.Empty;
+            selectedRepository = string.Empty;
+            selectedRepositoryStatus = null;
+            return;
+        }
+
+        var selectedStillExists = indexedRepos.Any(repo =>
+            string.Equals(repo.Owner, selectedOwner, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(repo.Repository, selectedRepository, StringComparison.OrdinalIgnoreCase));
+
+        if (!selectedStillExists)
+        {
+            selectedOwner = indexedRepos[0].Owner;
+            selectedRepository = indexedRepos[0].Repository;
+        }
+
+        selectedRepositoryStatus = indexedRepos.FirstOrDefault(repo =>
+            string.Equals(repo.Owner, selectedOwner, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(repo.Repository, selectedRepository, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public void Dispose()
+    {
+        statusPollingCts?.Cancel();
+        statusPollingCts?.Dispose();
     }
 
     private void SuggestStartingFiles()

@@ -123,4 +123,29 @@ public class InMemoryRepositoryEmbeddingStoreTests
 
         Assert.Empty(results);
     }
+
+    [Fact]
+    public async Task UpsertRepositoryEmbeddingsAsync_MergesAndReplacesByChunkId()
+    {
+        var store = new InMemoryRepositoryEmbeddingStore();
+
+        await store.ReplaceRepositoryEmbeddingsAsync("octocat", "hello-world",
+        [
+            MakeRecord("octocat", "hello-world", "c1", [1f, 0f])
+        ]);
+
+        await store.UpsertRepositoryEmbeddingsAsync("octocat", "hello-world",
+        [
+            MakeRecord("octocat", "hello-world", "c1", [0.5f, 0.5f]),
+            MakeRecord("octocat", "hello-world", "c2", [0f, 1f])
+        ]);
+
+        var all = await store.GetRepositoryEmbeddingsAsync("octocat", "hello-world");
+
+        Assert.Equal(2, all.Count);
+        var c1 = Assert.Single(all, e => e.ChunkId == "c1");
+        Assert.Equal(0.5f, c1.Embedding[0]);
+        Assert.Equal(0.5f, c1.Embedding[1]);
+        Assert.Contains(all, e => e.ChunkId == "c2");
+    }
 }

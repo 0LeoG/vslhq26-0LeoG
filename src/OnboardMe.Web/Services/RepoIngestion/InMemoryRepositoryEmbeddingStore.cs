@@ -4,19 +4,44 @@ namespace OnboardMe.Web.Services.RepoIngestion;
 
 public sealed class InMemoryRepositoryEmbeddingStore : IRepositoryEmbeddingStore
 {
-    private readonly ConcurrentDictionary<string, IReadOnlyList<RepositoryChunkEmbeddingRecord>> embeddingsByRepository = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, RepositoryChunkEmbeddingRecord>> embeddingsByRepository = new(StringComparer.OrdinalIgnoreCase);
 
     public Task ReplaceRepositoryEmbeddingsAsync(string owner, string repository, IReadOnlyList<RepositoryChunkEmbeddingRecord> embeddings, CancellationToken cancellationToken = default)
     {
-        embeddingsByRepository[BuildKey(owner, repository)] = embeddings.ToArray();
+        var byChunkId = new ConcurrentDictionary<string, RepositoryChunkEmbeddingRecord>(StringComparer.OrdinalIgnoreCase);
+        foreach (var embedding in embeddings)
+        {
+            byChunkId[embedding.ChunkId] = embedding;
+        }
+
+        embeddingsByRepository[BuildKey(owner, repository)] = byChunkId;
+        return Task.CompletedTask;
+    }
+
+    public Task UpsertRepositoryEmbeddingsAsync(string owner, string repository, IReadOnlyList<RepositoryChunkEmbeddingRecord> embeddings, CancellationToken cancellationToken = default)
+    {
+        if (embeddings.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+
+        var byChunkId = embeddingsByRepository.GetOrAdd(
+            BuildKey(owner, repository),
+            _ => new ConcurrentDictionary<string, RepositoryChunkEmbeddingRecord>(StringComparer.OrdinalIgnoreCase));
+
+        foreach (var embedding in embeddings)
+        {
+            byChunkId[embedding.ChunkId] = embedding;
+        }
+
         return Task.CompletedTask;
     }
 
     public Task<IReadOnlyList<RepositoryChunkEmbeddingRecord>> GetRepositoryEmbeddingsAsync(string owner, string repository, CancellationToken cancellationToken = default)
     {
-        if (embeddingsByRepository.TryGetValue(BuildKey(owner, repository), out var embeddings))
+        if (embeddingsByRepository.TryGetValue(BuildKey(owner, repository), out var embeddingsByChunkId))
         {
-            return Task.FromResult(embeddings);
+            return Task.FromResult<IReadOnlyList<RepositoryChunkEmbeddingRecord>>(embeddingsByChunkId.Values.ToArray());
         }
 
         return Task.FromResult<IReadOnlyList<RepositoryChunkEmbeddingRecord>>([]);
@@ -35,10 +60,13 @@ public sealed class InMemoryRepositoryEmbeddingStore : IRepositoryEmbeddingStore
             return Task.FromResult<IReadOnlyList<VectorSearchResult>>([]);
         }
 
-        if (!embeddingsByRepository.TryGetValue(BuildKey(owner, repository), out var allChunks) || allChunks.Count == 0)
+        if (!embeddingsByRepository.TryGetValue(BuildKey(owner, repository), out var allChunksByChunkId)
+            || allChunksByChunkId.Count == 0)
         {
             return Task.FromResult<IReadOnlyList<VectorSearchResult>>([]);
         }
+
+        var allChunks = allChunksByChunkId.Values;
 
         var queryNorm = ComputeNorm(queryEmbedding);
         if (queryNorm == 0f)

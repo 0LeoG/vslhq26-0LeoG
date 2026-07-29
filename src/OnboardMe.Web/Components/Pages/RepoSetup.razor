@@ -1,5 +1,6 @@
 @page "/repo-setup"
 @rendermode InteractiveServer
+@implements IDisposable
 @inject IRepositoryIngestionService RepositoryIngestionService
 
 <PageTitle>Repo Setup</PageTitle>
@@ -75,6 +76,8 @@
     private string? successMessage;
     private bool isIngestionRunning;
     private RepositoryIndexingStatus? currentStatus;
+    private CancellationTokenSource? statusPollingCts;
+
     private int ProgressPercent => currentStatus?.TotalFileCount > 0
         ? Math.Clamp((int)((double)currentStatus.ProcessedFileCount / currentStatus.TotalFileCount * 100), 0, 100)
         : 0;
@@ -97,45 +100,82 @@
             return;
         }
 
-        isIngestionRunning = true;
-        StateHasChanged();
+        var status = await RepositoryIngestionService.StartRepositoryIngestionAsync(owner, repository);
+        currentStatus = status;
+        isIngestionRunning = status.State == RepositoryIndexingState.Running;
 
-        RepositoryIndexingStatus? status = null;
-        var ingestionTask = RepositoryIngestionService.IngestRepositoryAsync(owner, repository);
-        try
+        if (isIngestionRunning)
         {
-            while (!ingestionTask.IsCompleted)
-            {
-                currentStatus = await RepositoryIngestionService.GetLatestStatusAsync(owner, repository);
-                StateHasChanged();
-                await Task.Delay(500);
-            }
-
-            status = await ingestionTask;
-            currentStatus = status;
+            successMessage = "Repository indexing started in the background. You can move to chat now while progress continues.";
+            StartStatusPolling(owner, repository);
         }
-        finally
-        {
-            isIngestionRunning = false;
-        }
-        if (status is null)
-        {
-            errorMessage = "Repository ingestion failed unexpectedly.";
-            return;
-        }
-
-        if (status.State == RepositoryIndexingState.Failed)
+        else if (status.State == RepositoryIndexingState.Failed)
         {
             errorMessage = $"Repository ingestion failed: {status.ErrorMessage}";
-            return;
+        }
+        else
+        {
+            successMessage = $"Indexed {status.IndexedCount} files, skipped {status.SkippedCount}, failed {status.FailedCount}, embedded {status.EmbeddedChunkCount} chunks.";
+            if (status.State == RepositoryIndexingState.CompletedWithErrors && !string.IsNullOrWhiteSpace(status.ErrorMessage))
+            {
+                errorMessage = status.ErrorMessage;
+            }
         }
 
-        successMessage = $"Indexed {status.IndexedCount} files, skipped {status.SkippedCount}, failed {status.FailedCount}, embedded {status.EmbeddedChunkCount} chunks.";
-        if (status.State == RepositoryIndexingState.CompletedWithErrors && !string.IsNullOrWhiteSpace(status.ErrorMessage))
-        {
-            errorMessage = status.ErrorMessage;
-        }
         formModel.RepositoryUrl = normalizedUrl;
+    }
+
+    private void StartStatusPolling(string owner, string repository)
+    {
+        statusPollingCts?.Cancel();
+        statusPollingCts?.Dispose();
+        statusPollingCts = new CancellationTokenSource();
+        var cancellationToken = statusPollingCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var latestStatus = await RepositoryIngestionService.GetLatestStatusAsync(owner, repository, cancellationToken);
+                    if (latestStatus is not null)
+                    {
+                        currentStatus = latestStatus;
+                        isIngestionRunning = latestStatus.State == RepositoryIndexingState.Running;
+
+                        if (!isIngestionRunning)
+                        {
+                            successMessage = $"Indexed {latestStatus.IndexedCount} files, skipped {latestStatus.SkippedCount}, failed {latestStatus.FailedCount}, embedded {latestStatus.EmbeddedChunkCount} chunks.";
+                            if (latestStatus.State == RepositoryIndexingState.Failed)
+                            {
+                                errorMessage = $"Repository ingestion failed: {latestStatus.ErrorMessage}";
+                            }
+                            else if (latestStatus.State == RepositoryIndexingState.CompletedWithErrors && !string.IsNullOrWhiteSpace(latestStatus.ErrorMessage))
+                            {
+                                errorMessage = latestStatus.ErrorMessage;
+                            }
+
+                            await InvokeAsync(StateHasChanged);
+                            break;
+                        }
+                    }
+
+                    await InvokeAsync(StateHasChanged);
+                    await Task.Delay(750, cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Ignore normal cancellation when navigating away or starting a new run.
+            }
+        }, cancellationToken);
+    }
+
+    public void Dispose()
+    {
+        statusPollingCts?.Cancel();
+        statusPollingCts?.Dispose();
     }
 
     private sealed class RepositoryFormModel
