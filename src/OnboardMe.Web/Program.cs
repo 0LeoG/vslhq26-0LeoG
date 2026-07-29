@@ -6,6 +6,14 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using OnboardMe.Web.Components;
 
+const string GitHubScheme = "GitHub";
+const string GitHubClientIdConfigKey = "GitHub:ClientId";
+const string GitHubClientSecretConfigKey = "GitHub:ClientSecret";
+const string GitHubCallbackPathConfigKey = "GitHub:CallbackPath";
+const string DefaultGitHubCallbackPath = "/signin-github";
+const string AppUserAgentProductName = "onboard-me";
+const string AppUserAgentProductVersion = "1.0";
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -13,9 +21,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddAuthorization();
 
-var githubClientId = builder.Configuration["GitHub:ClientId"];
-var githubClientSecret = builder.Configuration["GitHub:ClientSecret"];
-var githubCallbackPath = builder.Configuration["GitHub:CallbackPath"] ?? "/signin-github";
+var githubClientId = builder.Configuration[GitHubClientIdConfigKey];
+var githubClientSecret = builder.Configuration[GitHubClientSecretConfigKey];
+var githubCallbackPath = builder.Configuration[GitHubCallbackPathConfigKey] ?? DefaultGitHubCallbackPath;
 var githubAuthConfigured = !string.IsNullOrWhiteSpace(githubClientId)
     && !string.IsNullOrWhiteSpace(githubClientSecret);
 
@@ -29,7 +37,7 @@ var authentication = builder.Services
 
 if (githubAuthConfigured)
 {
-    authentication.AddOAuth("GitHub", options =>
+    authentication.AddOAuth(GitHubScheme, options =>
     {
         options.ClientId = githubClientId!;
         options.ClientSecret = githubClientSecret!;
@@ -55,7 +63,7 @@ if (githubAuthConfigured)
                 using var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
                 request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", context.AccessToken);
-                request.Headers.UserAgent.Add(new ProductInfoHeaderValue("onboard-me", "1.0"));
+                request.Headers.UserAgent.Add(new ProductInfoHeaderValue(AppUserAgentProductName, AppUserAgentProductVersion));
 
                 using var response = await context.Backchannel.SendAsync(request, context.HttpContext.RequestAborted);
                 response.EnsureSuccessStatusCode();
@@ -89,14 +97,14 @@ app.MapGet("/auth/signin", (HttpContext context, string? returnUrl) =>
     {
         return Results.Problem(
             title: "GitHub authentication is not configured.",
-            detail: "Set GitHub:ClientId and GitHub:ClientSecret to enable sign-in.",
+            detail: $"Set {GitHubClientIdConfigKey} and {GitHubClientSecretConfigKey} to enable sign-in.",
             statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 
     var redirectUri = NormalizeReturnUrl(returnUrl);
     return Results.Challenge(
         new AuthenticationProperties { RedirectUri = redirectUri },
-        authenticationSchemes: ["GitHub"]);
+        authenticationSchemes: [GitHubScheme]);
 });
 
 app.MapGet("/auth/signout", (string? returnUrl) =>

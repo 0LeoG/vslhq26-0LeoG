@@ -20,21 +20,21 @@
                 <label class="form-label" for="repo-url">Repository URL</label>
                 <InputText id="repo-url"
                            class="form-control"
-                           @bind-Value="RepositoryUrl"
+                           @bind-Value="repositoryUrl"
                            placeholder="https://github.com/owner/repo" />
                 <div class="form-text">Only root GitHub repository links are supported for now.</div>
             </div>
             <button type="submit" class="btn btn-primary">Connect repository</button>
         </EditForm>
 
-        @if (!string.IsNullOrWhiteSpace(ErrorMessage))
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
         {
-            <div class="alert alert-danger mt-3" role="alert">@ErrorMessage</div>
+            <div class="alert alert-danger mt-3" role="alert">@errorMessage</div>
         }
 
-        @if (!string.IsNullOrWhiteSpace(SuccessMessage))
+        @if (!string.IsNullOrWhiteSpace(successMessage))
         {
-            <div class="alert alert-success mt-3" role="alert">@SuccessMessage</div>
+            <div class="alert alert-success mt-3" role="alert">@successMessage</div>
         }
 
         <p class="mt-3 text-muted">
@@ -48,23 +48,23 @@
 </AuthorizeView>
 
 @code {
-    private string? RepositoryUrl;
-    private string? ErrorMessage;
-    private string? SuccessMessage;
+    private string? repositoryUrl;
+    private string? errorMessage;
+    private string? successMessage;
 
     private void ConnectRepository()
     {
-        ErrorMessage = null;
-        SuccessMessage = null;
+        errorMessage = null;
+        successMessage = null;
 
-        if (!TryNormalizeGitHubRepositoryUrl(RepositoryUrl, out var normalizedUrl, out var validationError))
+        if (!TryNormalizeGitHubRepositoryUrl(repositoryUrl, out var normalizedUrl, out var validationError))
         {
-            ErrorMessage = validationError;
+            errorMessage = validationError;
             return;
         }
 
-        SuccessMessage = $"Repository connected: {normalizedUrl}";
-        RepositoryUrl = normalizedUrl;
+        successMessage = $"Repository connected: {normalizedUrl}";
+        repositoryUrl = normalizedUrl;
     }
 
     private static bool TryNormalizeGitHubRepositoryUrl(string? input, out string normalizedUrl, out string errorMessage)
