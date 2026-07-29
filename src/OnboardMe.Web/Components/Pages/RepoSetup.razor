@@ -38,7 +38,7 @@
         }
 
         <p class="mt-3 text-muted">
-            Private repositories require your GitHub account to grant this app repository access.
+            Private repository access is not enabled in this first pass. We can add expanded GitHub scopes when private repo ingestion is implemented.
         </p>
     </Authorized>
     <NotAuthorized>
@@ -63,7 +63,7 @@
             return;
         }
 
-        successMessage = $"Repository connected: {normalizedUrl}";
+        successMessage = $"Repository URL validated: {normalizedUrl}";
         repositoryUrl = normalizedUrl;
     }
 

@@ -48,7 +48,6 @@ if (githubAuthConfigured)
         options.SaveTokens = true;
 
         options.Scope.Add("read:user");
-        options.Scope.Add("repo");
 
         options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
         options.ClaimActions.MapJsonKey(ClaimTypes.Name, "login");
@@ -133,7 +132,17 @@ static string NormalizeReturnUrl(string? returnUrl)
         return "/repo-setup";
     }
 
-    if (!returnUrl.StartsWith('/') || returnUrl.StartsWith("//") || returnUrl.StartsWith("/\\"))
+    if (!returnUrl.StartsWith('/'))
+    {
+        return "/repo-setup";
+    }
+
+    if (returnUrl.Length > 1 && (returnUrl[1] == '/' || returnUrl[1] == '\\'))
+    {
+        return "/repo-setup";
+    }
+
+    if (returnUrl.Contains('\\'))
     {
         return "/repo-setup";
     }
