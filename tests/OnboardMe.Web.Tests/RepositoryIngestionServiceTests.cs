@@ -65,6 +65,12 @@ public class RepositoryIngestionServiceTests
         Assert.Equal("src/App.cs", indexedFile.Path);
         Assert.Equal("C#", indexedFile.Language);
         Assert.Equal("public class App {}", indexedFile.Content);
+        var chunk = Assert.Single(indexedFile.Chunks);
+        Assert.Equal("src/App.cs", chunk.SourcePath);
+        Assert.Equal("sha-app:0", chunk.ChunkId);
+        Assert.Equal(1, chunk.StartLine);
+        Assert.Equal(1, chunk.EndLine);
+        Assert.Equal("public class App {}", chunk.Content);
     }
 
     private static HttpResponseMessage JsonResponse<T>(T payload)
