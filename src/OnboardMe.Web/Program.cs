@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using OnboardMe.Web.Components;
+using OnboardMe.Web.Services.RepoIngestion;
 
 const string GitHubScheme = "GitHub";
 const string GitHubClientIdConfigKey = "GitHub:ClientId";
@@ -21,6 +22,14 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorization();
+builder.Services.AddHttpClient(RepositoryIngestionService.GitHubApiClientName, client =>
+{
+    client.BaseAddress = new Uri("https://api.github.com/");
+    client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(AppUserAgentProductName, AppUserAgentProductVersion));
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+});
+builder.Services.AddSingleton<IRepositoryIndexingStatusStore, InMemoryRepositoryIndexingStatusStore>();
+builder.Services.AddSingleton<IRepositoryIngestionService, RepositoryIngestionService>();
 
 var githubClientId = builder.Configuration[GitHubClientIdConfigKey];
 var githubClientSecret = builder.Configuration[GitHubClientSecretConfigKey];

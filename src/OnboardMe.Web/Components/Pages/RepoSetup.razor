@@ -1,5 +1,6 @@
 @page "/repo-setup"
 @rendermode InteractiveServer
+@inject IRepositoryIngestionService RepositoryIngestionService
 
 <PageTitle>Repo Setup</PageTitle>
 
@@ -11,7 +12,7 @@
             Signed in as <strong>@authState.User.Identity?.Name</strong>.
         </p>
         <p>
-            <a class="btn btn-outline-secondary" href="/auth/signout?returnUrl=/repo-setup">Sign out of GitHub</a>
+            <a class="btn btn-outline-secondary" href="/auth/signout?returnUrl=/repo-setup" data-enhance-nav="false">Sign out of GitHub</a>
         </p>
 
         <p class="mt-4">Enter a GitHub repository URL to continue.</p>
@@ -43,7 +44,7 @@
     </Authorized>
     <NotAuthorized>
         <p>Sign in with GitHub to connect a repository.</p>
-        <a class="btn btn-primary" href="/auth/signin?returnUrl=/repo-setup">Sign in with GitHub</a>
+        <a class="btn btn-primary" href="/auth/signin?returnUrl=/repo-setup" data-enhance-nav="false">Sign in with GitHub</a>
     </NotAuthorized>
 </AuthorizeView>
 
@@ -52,7 +53,7 @@
     private string? errorMessage;
     private string? successMessage;
 
-    private void ConnectRepository()
+    private async Task ConnectRepository()
     {
         errorMessage = null;
         successMessage = null;
@@ -63,7 +64,20 @@
             return;
         }
 
-        successMessage = $"Repository URL validated: {normalizedUrl}";
+        if (!TryParseOwnerAndRepository(normalizedUrl, out var owner, out var repository))
+        {
+            errorMessage = "Could not parse repository owner and name.";
+            return;
+        }
+
+        var status = await RepositoryIngestionService.IngestRepositoryAsync(owner, repository);
+        if (status.State == RepositoryIndexingState.Failed)
+        {
+            errorMessage = $"Repository ingestion failed: {status.ErrorMessage}";
+            return;
+        }
+
+        successMessage = $"Indexed {status.IndexedCount} files, skipped {status.SkippedCount}, failed {status.FailedCount}.";
         formModel.RepositoryUrl = normalizedUrl;
     }
 
@@ -125,6 +139,28 @@
         }
 
         normalizedUrl = $"https://github.com/{owner}/{repo}";
+        return true;
+    }
+
+    private static bool TryParseOwnerAndRepository(string normalizedUrl, out string owner, out string repository)
+    {
+        owner = string.Empty;
+        repository = string.Empty;
+
+        if (!Uri.TryCreate(normalizedUrl, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        var path = uri.AbsolutePath.Trim('/');
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length != 2)
+        {
+            return false;
+        }
+
+        owner = segments[0];
+        repository = segments[1];
         return true;
     }
 }
