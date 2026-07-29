@@ -19,4 +19,6 @@ public sealed class RepositoryFileIngestionRecord
     public string? ErrorMessage { get; set; }
 
     public string? Content { get; set; }
+
+    public List<RepositoryContentChunk> Chunks { get; } = [];
 }

@@ -81,6 +81,10 @@ public sealed class RepositoryIngestionService(
                 try
                 {
                     file.Content = await GetBlobContentAsync(client, owner, repository, item.Sha, cancellationToken);
+                    if (!string.IsNullOrWhiteSpace(file.Content))
+                    {
+                        file.Chunks.AddRange(RepositoryContentChunker.ChunkFile(path, item.Sha, file.Content, file.Language));
+                    }
                 }
                 catch (Exception ex)
                 {
