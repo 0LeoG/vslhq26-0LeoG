@@ -35,6 +35,44 @@ else
         </select>
     </div>
 
+    <div class="start-here-panel">
+        <h2 class="h5 mb-2">Where should I start?</h2>
+        <p class="text-muted mb-2">Describe what you need to change, then get suggested files to read first.</p>
+
+        <EditForm Model="startHereInputModel" OnSubmit="SuggestStartingFiles">
+            <div class="input-group">
+                <InputText class="form-control"
+                           @bind-Value="startHereInputModel.TaskPrompt"
+                           placeholder="Example: I need to change auth"
+                           disabled="@isLoading"
+                           aria-label="Task prompt" />
+                <button type="submit" class="btn btn-outline-primary" disabled="@(isLoading || string.IsNullOrWhiteSpace(startHereInputModel.TaskPrompt))">
+                    Suggest files
+                </button>
+            </div>
+        </EditForm>
+
+        @if (!string.IsNullOrWhiteSpace(startHereMessage))
+        {
+            <p class="text-muted mt-2 mb-0">@startHereMessage</p>
+        }
+
+        @if (startHereSuggestions.Count > 0)
+        {
+            <ul class="start-here-list mt-3 mb-0">
+                @foreach (var suggestion in startHereSuggestions)
+                {
+                    <li>
+                        <a href="https://github.com/@selectedOwner/@selectedRepository/blob/HEAD/@suggestion.Path"
+                           target="_blank"
+                           rel="noopener noreferrer">@suggestion.Path</a>
+                        <div class="text-muted">@suggestion.Reason</div>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+
     @* Message list *@
     <div class="message-list" aria-live="polite" aria-label="Chat messages">
         @if (messages.Count == 0)
@@ -131,6 +169,9 @@ else
     private string selectedRepository = string.Empty;
     private IReadOnlyList<RepositoryIndexingStatus> indexedRepos = [];
     private readonly List<ChatMessageModel> messages = [];
+    private readonly StartHereInputModel startHereInputModel = new();
+    private IReadOnlyList<StartHereSuggestion> startHereSuggestions = [];
+    private string? startHereMessage;
 
     private readonly ChatInputModel inputModel = new();
 
@@ -171,6 +212,8 @@ else
 
         // Clear conversation when the user switches repos.
         messages.Clear();
+        startHereSuggestions = [];
+        startHereMessage = null;
     }
 
     private async Task SendMessage()
@@ -233,6 +276,31 @@ else
         }
     }
 
+    private void SuggestStartingFiles()
+    {
+        var prompt = startHereInputModel.TaskPrompt?.Trim();
+        if (string.IsNullOrWhiteSpace(prompt))
+        {
+            return;
+        }
+
+        var selectedRepo = indexedRepos.FirstOrDefault(repo =>
+            string.Equals(repo.Owner, selectedOwner, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(repo.Repository, selectedRepository, StringComparison.OrdinalIgnoreCase));
+
+        if (selectedRepo is null)
+        {
+            startHereSuggestions = [];
+            startHereMessage = "Select a repository first.";
+            return;
+        }
+
+        startHereSuggestions = StartHereGuideGenerator.CreateSuggestions(prompt, selectedRepo.Files);
+        startHereMessage = startHereSuggestions.Count == 0
+            ? "No starter files found yet. Try a more specific task prompt."
+            : "Simple keyword-based suggestions for now; this can be improved with richer repo mapping later.";
+    }
+
     // -------------------------------------------------------------------------
     // Inner models
     // -------------------------------------------------------------------------
@@ -252,5 +320,10 @@ else
     {
         public string? Question { get; set; }
     }
-}
 
+    /// <summary>Bound model for the guided start prompt.</summary>
+    private sealed class StartHereInputModel
+    {
+        public string? TaskPrompt { get; set; }
+    }
+}

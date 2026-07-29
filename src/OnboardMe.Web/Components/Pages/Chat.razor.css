@@ -7,6 +7,22 @@
     max-width: 400px;
 }
 
+.start-here-panel {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #f8f9fa;
+}
+
+.start-here-list {
+    padding-left: 1rem;
+}
+
+    .start-here-list li {
+        margin-bottom: 0.6rem;
+    }
+
 .message-list {
     display: flex;
     flex-direction: column;
