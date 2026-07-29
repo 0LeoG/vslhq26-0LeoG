@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\OnboardMe.Web\OnboardMe.Web.csproj" />
+    <ProjectReference Include="..\..\src\OnboardMe.Web.Models\OnboardMe.Web.Models.csproj" />
   </ItemGroup>
 
 </Project>

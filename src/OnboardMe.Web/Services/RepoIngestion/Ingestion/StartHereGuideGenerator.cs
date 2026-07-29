@@ -198,10 +198,3 @@ public static class StartHereGuideGenerator
         public required IReadOnlyList<string> MatchedKeywords { get; init; }
     }
 }
-
-public sealed class StartHereSuggestion
-{
-    public required string Path { get; init; }
-
-    public required string Reason { get; init; }
-}

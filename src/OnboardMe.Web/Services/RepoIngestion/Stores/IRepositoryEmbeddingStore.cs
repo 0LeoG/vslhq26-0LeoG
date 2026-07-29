@@ -9,8 +9,8 @@ public interface IRepositoryEmbeddingStore
     Task<IReadOnlyList<RepositoryChunkEmbeddingRecord>> GetRepositoryEmbeddingsAsync(string owner, string repository, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Returns the <paramref name="topK"/> most similar chunks for the given <paramref name="owner"/>/<paramref name="repository"/>
-    /// workspace, ranked by cosine similarity to <paramref name="queryEmbedding"/>. Results never bleed across repos.
+    /// Returns the <paramref name="topK" /> most similar chunks for the given <paramref name="owner" />/<paramref name="repository" />
+    /// workspace, ranked by cosine similarity to <paramref name="queryEmbedding" />. Results never bleed across repos.
     /// </summary>
     Task<IReadOnlyList<VectorSearchResult>> SearchByEmbeddingAsync(
         string owner,

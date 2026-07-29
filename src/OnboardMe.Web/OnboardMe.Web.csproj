@@ -8,4 +8,8 @@
     <UserSecretsId>OnboardMe.Web-LocalSecrets</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\OnboardMe.Web.Models\OnboardMe.Web.Models.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -34,6 +34,7 @@ builder.Services.AddHttpClient(AzureOpenAiChatService.AzureOpenAiChatClientName)
 builder.Services.Configure<AzureOpenAiEmbeddingsOptions>(builder.Configuration.GetSection(AzureOpenAiEmbeddingsOptions.SectionName));
 builder.Services.AddSingleton<IRepositoryIndexingStatusStore, InMemoryRepositoryIndexingStatusStore>();
 builder.Services.AddSingleton<IRepositoryEmbeddingStore, InMemoryRepositoryEmbeddingStore>();
+builder.Services.AddSingleton<IConversationStore, InMemoryConversationStore>();
 builder.Services.AddSingleton<IAzureOpenAiEmbeddingService, AzureOpenAiEmbeddingService>();
 builder.Services.AddSingleton<IAzureOpenAiChatService, AzureOpenAiChatService>();
 builder.Services.AddSingleton<IRepositoryIngestionService, RepositoryIngestionService>();
@@ -167,7 +168,7 @@ app.MapPost("/repos/{owner}/{repository}/search", async (
     var topK = body.TopK is > 0 ? body.TopK.Value : 5;
 
     // Embed the query as a single-chunk synthetic record so we can reuse the embedding service.
-    var queryChunk = new OnboardMe.Web.Services.RepoIngestion.RepositoryContentChunk
+    var queryChunk = new RepositoryContentChunk
     {
         ChunkId = "query:0",
         SourcePath = "__query__",
@@ -179,7 +180,7 @@ app.MapPost("/repos/{owner}/{repository}/search", async (
         Content = body.Query
     };
 
-    IReadOnlyList<OnboardMe.Web.Services.RepoIngestion.RepositoryChunkEmbeddingRecord> queryEmbeddings;
+    IReadOnlyList<RepositoryChunkEmbeddingRecord> queryEmbeddings;
     try
     {
         queryEmbeddings = await embeddingService.GenerateEmbeddingsAsync(owner, repository, [queryChunk], cancellationToken);
@@ -232,7 +233,7 @@ app.MapPost("/repos/{owner}/{repository}/chat", async (
     var topK = body.TopK is > 0 ? body.TopK.Value : 5;
 
     // Step 1: embed the question so we can retrieve relevant chunks.
-    var queryChunk = new OnboardMe.Web.Services.RepoIngestion.RepositoryContentChunk
+    var queryChunk = new RepositoryContentChunk
     {
         ChunkId = "query:0",
         SourcePath = "__query__",
@@ -244,7 +245,7 @@ app.MapPost("/repos/{owner}/{repository}/chat", async (
         Content = body.Question
     };
 
-    IReadOnlyList<OnboardMe.Web.Services.RepoIngestion.RepositoryChunkEmbeddingRecord> queryEmbeddings;
+    IReadOnlyList<RepositoryChunkEmbeddingRecord> queryEmbeddings;
     try
     {
         queryEmbeddings = await embeddingService.GenerateEmbeddingsAsync(owner, repository, [queryChunk], cancellationToken);
@@ -262,10 +263,10 @@ app.MapPost("/repos/{owner}/{repository}/chat", async (
     var contextChunks = await embeddingStore.SearchByEmbeddingAsync(owner, repository, queryEmbedding, topK, cancellationToken);
 
     // Step 3: send question + context to the chat model and return a grounded answer.
-    OnboardMe.Web.Services.RepoIngestion.ChatAnswer chatAnswer;
+    ChatAnswer chatAnswer;
     try
     {
-        chatAnswer = await chatService.AnswerAsync(owner, repository, body.Question, contextChunks, cancellationToken);
+        chatAnswer = await chatService.AnswerAsync(owner, repository, body.Question, contextChunks, cancellationToken: cancellationToken);
     }
     catch (Exception ex)
     {
