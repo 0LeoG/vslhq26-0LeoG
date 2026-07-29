@@ -72,15 +72,4 @@ public class RepositoryIngestionServiceTests
         {
             Content = JsonContent.Create(payload)
         };
-
-    private sealed class StubHttpClientFactory(HttpClient client) : IHttpClientFactory
-    {
-        public HttpClient CreateClient(string name) => client;
-    }
-
-    private sealed class StubHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-            => Task.FromResult(handler(request));
-    }
 }

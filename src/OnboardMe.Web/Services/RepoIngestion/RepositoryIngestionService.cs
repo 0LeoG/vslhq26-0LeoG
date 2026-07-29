@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
-using System.Text.Json.Serialization;
 
 namespace OnboardMe.Web.Services.RepoIngestion;
 
@@ -162,32 +161,4 @@ public sealed class RepositoryIngestionService(
 
         throw new InvalidOperationException($"GitHub request failed with {(int)response.StatusCode}: {details}");
     }
-
-    private sealed class GitHubRepositoryMetadata
-    {
-        [JsonPropertyName("default_branch")]
-        public required string DefaultBranch { get; init; }
-    }
-
-    private sealed class GitHubTreeResponse
-    {
-        [JsonPropertyName("tree")]
-        public List<GitHubTreeItem> Tree { get; init; } = [];
-    }
-
-    private sealed class GitHubTreeItem
-    {
-        [JsonPropertyName("path")]
-        public required string Path { get; init; }
-
-        [JsonPropertyName("type")]
-        public required string Type { get; init; }
-
-        [JsonPropertyName("sha")]
-        public required string Sha { get; init; }
-
-        [JsonPropertyName("size")]
-        public long? Size { get; init; }
-    }
-
 }
