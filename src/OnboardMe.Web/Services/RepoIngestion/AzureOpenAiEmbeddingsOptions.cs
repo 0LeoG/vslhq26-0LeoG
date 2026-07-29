@@ -10,10 +10,17 @@ public sealed class AzureOpenAiEmbeddingsOptions
 
     public string? EmbeddingsDeployment { get; init; }
 
+    public string? ChatDeployment { get; init; }
+
     public string ApiVersion { get; init; } = "2024-02-01";
 
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(Endpoint)
         && !string.IsNullOrWhiteSpace(ApiKey)
         && !string.IsNullOrWhiteSpace(EmbeddingsDeployment);
+
+    public bool IsChatConfigured =>
+        !string.IsNullOrWhiteSpace(Endpoint)
+        && !string.IsNullOrWhiteSpace(ApiKey)
+        && !string.IsNullOrWhiteSpace(ChatDeployment);
 }

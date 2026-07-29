@@ -30,10 +30,12 @@ builder.Services.AddHttpClient(RepositoryIngestionService.GitHubApiClientName, c
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
 });
 builder.Services.AddHttpClient(AzureOpenAiEmbeddingService.AzureOpenAiClientName);
+builder.Services.AddHttpClient(AzureOpenAiChatService.AzureOpenAiChatClientName);
 builder.Services.Configure<AzureOpenAiEmbeddingsOptions>(builder.Configuration.GetSection(AzureOpenAiEmbeddingsOptions.SectionName));
 builder.Services.AddSingleton<IRepositoryIndexingStatusStore, InMemoryRepositoryIndexingStatusStore>();
 builder.Services.AddSingleton<IRepositoryEmbeddingStore, InMemoryRepositoryEmbeddingStore>();
 builder.Services.AddSingleton<IAzureOpenAiEmbeddingService, AzureOpenAiEmbeddingService>();
+builder.Services.AddSingleton<IAzureOpenAiChatService, AzureOpenAiChatService>();
 builder.Services.AddSingleton<IRepositoryIngestionService, RepositoryIngestionService>();
 
 var githubClientId = builder.Configuration[GitHubClientIdConfigKey];
@@ -210,6 +212,84 @@ app.MapPost("/repos/{owner}/{repository}/search", async (
     });
 });
 
+// POST /repos/{owner}/{repository}/chat
+// Body: { "question": "...", "topK": 5 }
+// Retrieves the most relevant chunks, sends them to Azure OpenAI Chat, and returns an answer with file citations.
+app.MapPost("/repos/{owner}/{repository}/chat", async (
+    string owner,
+    string repository,
+    ChatRequest body,
+    IAzureOpenAiEmbeddingService embeddingService,
+    IRepositoryEmbeddingStore embeddingStore,
+    IAzureOpenAiChatService chatService,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(body.Question))
+    {
+        return Results.BadRequest(new { message = "Question must not be empty." });
+    }
+
+    var topK = body.TopK is > 0 ? body.TopK.Value : 5;
+
+    // Step 1: embed the question so we can retrieve relevant chunks.
+    var queryChunk = new OnboardMe.Web.Services.RepoIngestion.RepositoryContentChunk
+    {
+        ChunkId = "query:0",
+        SourcePath = "__query__",
+        SourceSha = string.Empty,
+        ChunkIndex = 0,
+        Strategy = "query",
+        StartLine = 0,
+        EndLine = 0,
+        Content = body.Question
+    };
+
+    IReadOnlyList<OnboardMe.Web.Services.RepoIngestion.RepositoryChunkEmbeddingRecord> queryEmbeddings;
+    try
+    {
+        queryEmbeddings = await embeddingService.GenerateEmbeddingsAsync(owner, repository, [queryChunk], cancellationToken);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Embedding generation failed.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+
+    // Step 2: retrieve the most relevant chunks from the store.
+    var queryEmbedding = queryEmbeddings[0].Embedding;
+    var contextChunks = await embeddingStore.SearchByEmbeddingAsync(owner, repository, queryEmbedding, topK, cancellationToken);
+
+    // Step 3: send question + context to the chat model and return a grounded answer.
+    OnboardMe.Web.Services.RepoIngestion.ChatAnswer chatAnswer;
+    try
+    {
+        chatAnswer = await chatService.AnswerAsync(owner, repository, body.Question, contextChunks, cancellationToken);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Chat completion failed.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+
+    return Results.Ok(new
+    {
+        owner,
+        repository,
+        question = body.Question,
+        answer = chatAnswer.Answer,
+        citations = chatAnswer.Citations.Select(c => new
+        {
+            path = c.Path,
+            startLine = c.StartLine,
+            endLine = c.EndLine
+        })
+    });
+});
+
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
@@ -253,5 +333,15 @@ internal sealed class SearchRequest
     public string Query { get; init; } = string.Empty;
 
     /// <summary>Maximum number of results to return. Defaults to 5 when omitted or ≤ 0.</summary>
+    public int? TopK { get; init; }
+}
+
+/// <summary>Request body for the chat endpoint.</summary>
+internal sealed class ChatRequest
+{
+    /// <summary>The natural-language question to answer.</summary>
+    public string Question { get; init; } = string.Empty;
+
+    /// <summary>Maximum number of context chunks to retrieve. Defaults to 5 when omitted or ≤ 0.</summary>
     public int? TopK { get; init; }
 }
