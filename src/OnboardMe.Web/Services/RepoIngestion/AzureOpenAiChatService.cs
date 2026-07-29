@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 
 namespace OnboardMe.Web.Services.RepoIngestion;
@@ -234,6 +235,7 @@ public sealed class AzureOpenAiChatService(
     {
         public required IReadOnlyList<AzureChatMessage> Messages { get; init; }
 
+        [JsonPropertyName("max_completion_tokens")]
         public int MaxTokens { get; init; } = 1024;
 
         public float Temperature { get; init; } = 0.2f;

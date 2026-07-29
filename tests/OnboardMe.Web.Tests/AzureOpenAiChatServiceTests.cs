@@ -90,6 +90,29 @@ public class AzureOpenAiChatServiceTests
         Assert.Equal("Retried answer.", result.Answer);
     }
 
+    [Fact]
+    public async Task AnswerAsync_SerializesMaxTokens_AsMaxTokensSnakeCase()
+    {
+        string? requestBody = null;
+
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            requestBody = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+            return JsonResponse(new
+            {
+                choices = new[] { new { message = new { content = "Answer text." } } }
+            });
+        });
+
+        var service = BuildService(handler);
+
+        _ = await service.AnswerAsync("owner", "repo", "question?", BuildChunks("a.cs", 1, 5));
+
+        Assert.NotNull(requestBody);
+        Assert.Contains("\"max_tokens\"", requestBody!, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"maxTokens\"", requestBody!, StringComparison.Ordinal);
+    }
+
     // -------------------------------------------------------------------------
     // Error conditions
     // -------------------------------------------------------------------------
