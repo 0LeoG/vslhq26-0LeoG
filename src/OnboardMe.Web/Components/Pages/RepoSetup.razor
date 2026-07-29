@@ -3,72 +3,74 @@
 @implements IDisposable
 @inject IRepositoryIngestionService RepositoryIngestionService
 
-<PageTitle>Repo Setup</PageTitle>
+<PageTitle>Repo Setup — onboard-me</PageTitle>
 
-<h1>Repo Setup</h1>
+<div class="page-scroll-area">
+    <h1>Repo Setup</h1>
 
-<AuthorizeView>
-    <Authorized Context="authState">
-        <p class="mb-2">
-            Signed in as <strong>@authState.User.Identity?.Name</strong>.
-        </p>
-        <p>
-            <a class="btn btn-outline-secondary" href="/auth/signout?returnUrl=/repo-setup" data-enhance-nav="false">Sign out of GitHub</a>
-        </p>
+    <AuthorizeView>
+        <Authorized Context="authState">
+            <p class="mb-2">
+                Signed in as <strong>@authState.User.Identity?.Name</strong>.
+            </p>
+            <p>
+                <a class="btn btn-outline-secondary btn-sm" href="/auth/signout?returnUrl=/repo-setup" data-enhance-nav="false">Sign out of GitHub</a>
+            </p>
 
-        <p class="mt-4">Enter a GitHub repository URL to continue.</p>
-        <EditForm Model="formModel" OnSubmit="ConnectRepository">
-            <div class="mb-3">
-                <label class="form-label" for="repo-url">Repository URL</label>
-                <InputText id="repo-url"
-                           class="form-control"
-                           @bind-Value="formModel.RepositoryUrl"
-                           placeholder="https://github.com/owner/repo" />
-                <div class="form-text">Only root GitHub repository links are supported for now.</div>
-            </div>
-            <button type="submit" class="btn btn-primary" disabled="@isIngestionRunning">
-                @(isIngestionRunning ? "Indexing repository..." : "Connect repository")
-            </button>
-        </EditForm>
-
-        @if (isIngestionRunning)
-        {
-            <div class="mt-3">
-                <p class="mb-2">
-                    Indexing files and creating chunks...
-                    @if (!string.IsNullOrWhiteSpace(currentStatus?.CurrentFilePath))
-                    {
-                        <span class="text-muted">(@currentStatus.CurrentFilePath)</span>
-                    }
-                </p>
-                <div class="progress" role="progressbar" aria-label="Repository indexing progress" aria-valuenow="@ProgressPercent" aria-valuemin="0" aria-valuemax="100">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: @($"{ProgressPercent}%")">@ProgressPercent%</div>
+            <p class="mt-4">Enter a GitHub repository URL to continue.</p>
+            <EditForm Model="formModel" OnSubmit="ConnectRepository">
+                <div class="mb-3">
+                    <label class="form-label" for="repo-url">Repository URL</label>
+                    <InputText id="repo-url"
+                               class="form-control"
+                               @bind-Value="formModel.RepositoryUrl"
+                               placeholder="https://github.com/owner/repo" />
+                    <div class="form-text">Only root GitHub repository links are supported for now.</div>
                 </div>
-                <p class="form-text mt-2 mb-0">
-                    Processed @currentStatus?.ProcessedFileCount of @currentStatus?.TotalFileCount files. Created @currentStatus?.ProcessedChunkCount chunks.
-                </p>
-            </div>
-        }
+                <button type="submit" class="btn btn-primary" disabled="@isIngestionRunning">
+                    @(isIngestionRunning ? "Indexing repository…" : "Connect repository")
+                </button>
+            </EditForm>
 
-        @if (!string.IsNullOrWhiteSpace(errorMessage))
-        {
-            <div class="alert alert-danger mt-3" role="alert">@errorMessage</div>
-        }
+            @if (isIngestionRunning)
+            {
+                <div class="mt-3">
+                    <p class="mb-2">
+                        Indexing files and creating chunks…
+                        @if (!string.IsNullOrWhiteSpace(currentStatus?.CurrentFilePath))
+                        {
+                            <span class="text-muted">(@currentStatus.CurrentFilePath)</span>
+                        }
+                    </p>
+                    <div class="progress" role="progressbar" aria-label="Repository indexing progress" aria-valuenow="@ProgressPercent" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: @($"{ProgressPercent}%")">@ProgressPercent%</div>
+                    </div>
+                    <p class="form-text mt-2 mb-0">
+                        Processed @currentStatus?.ProcessedFileCount of @currentStatus?.TotalFileCount files. Created @currentStatus?.ProcessedChunkCount chunks.
+                    </p>
+                </div>
+            }
 
-        @if (!string.IsNullOrWhiteSpace(successMessage))
-        {
-            <div class="alert alert-success mt-3" role="alert">@successMessage</div>
-        }
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="alert alert-danger mt-3" role="alert">@errorMessage</div>
+            }
 
-        <p class="mt-3 text-muted">
-            Private repository access is not enabled in this first pass. We can add expanded GitHub scopes when private repo ingestion is implemented.
-        </p>
-    </Authorized>
-    <NotAuthorized>
-        <p>Sign in with GitHub to connect a repository.</p>
-        <a class="btn btn-primary" href="/auth/signin?returnUrl=/repo-setup" data-enhance-nav="false">Sign in with GitHub</a>
-    </NotAuthorized>
-</AuthorizeView>
+            @if (!string.IsNullOrWhiteSpace(successMessage))
+            {
+                <div class="alert alert-success mt-3" role="alert">@successMessage</div>
+            }
+
+            <p class="mt-3 text-muted">
+                Private repository access is not enabled in this first pass. We can add expanded GitHub scopes when private repo ingestion is implemented.
+            </p>
+        </Authorized>
+        <NotAuthorized>
+            <p>Sign in with GitHub to connect a repository.</p>
+            <a class="btn btn-primary" href="/auth/signin?returnUrl=/repo-setup" data-enhance-nav="false">Sign in with GitHub</a>
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
 
 @code {
     private readonly RepositoryFormModel formModel = new();

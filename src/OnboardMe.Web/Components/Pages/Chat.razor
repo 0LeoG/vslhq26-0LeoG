@@ -7,199 +7,208 @@
 @inject IAzureOpenAiChatService ChatService
 @inject IConversationStore ConversationStore
 
-<PageTitle>Chat</PageTitle>
+<PageTitle>Chat — onboard-me</PageTitle>
 
-<h1>Chat</h1>
-
-@if (!hasLoadedState)
-{
-    <p class="text-muted">Loading...</p>
-}
-else if (indexedRepos.Count == 0)
-{
-    <div class="empty-state">
-        <p class="lead">No repository has been indexed yet.</p>
-        <p>Go to <a href="/repo-setup">Repo Setup</a> to index a GitHub repository before using chat.</p>
-    </div>
-}
-else
-{
-    @* Repository selector *@
-    <div class="mb-3 repo-selector">
-        <label class="form-label fw-semibold" for="repo-select">Repository</label>
-        <select id="repo-select" class="form-select" @onchange="OnRepoSelectionChanged">
-            @foreach (var repo in indexedRepos)
-            {
-                <option value="@($"{repo.Owner}/{repo.Repository}")" selected="@(selectedOwner == repo.Owner && selectedRepository == repo.Repository)">
-                    @repo.Owner/@repo.Repository@(repo.State == RepositoryIndexingState.Running ? " (indexing...)" : string.Empty)
-                </option>
-            }
-        </select>
+<div class="chat-page">
+    <div class="chat-header">
+        <h1>Chat</h1>
     </div>
 
-    @if (selectedRepositoryStatus?.State == RepositoryIndexingState.Running)
+    @if (!hasLoadedState)
     {
-        <div class="indexing-banner" role="status" aria-live="polite">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <strong>Repository is still indexing in the background.</strong>
-                <span class="text-muted small">Answers may improve as more files are processed.</span>
-            </div>
-            <div class="progress" role="progressbar" aria-label="Repository indexing progress" aria-valuenow="@SelectedRepositoryProgressPercent" aria-valuemin="0" aria-valuemax="100">
-                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: @($"{SelectedRepositoryProgressPercent}%")">
-                    @SelectedRepositoryProgressPercent%
-                </div>
-            </div>
-            <div class="form-text mt-2 mb-0">
-                Processed @selectedRepositoryStatus.ProcessedFileCount of @selectedRepositoryStatus.TotalFileCount files.
-                Embedded @selectedRepositoryStatus.EmbeddedChunkCount chunks.
+        <div class="chat-body">
+            <p class="text-muted">Loading…</p>
+        </div>
+    }
+    else if (indexedRepos.Count == 0)
+    {
+        <div class="chat-body">
+            <div class="empty-state">
+                <p class="lead">No repository has been indexed yet.</p>
+                <p>Go to <a href="/repo-setup">Repo Setup</a> to index a GitHub repository before using chat.</p>
             </div>
         </div>
     }
-
-    <div class="start-here-panel">
-        <h2 class="h5 mb-2">Where should I start?</h2>
-        <p class="text-muted mb-2">Describe what you need to change, then get suggested files to read first.</p>
-
-        <EditForm Model="startHereInputModel" OnSubmit="SuggestStartingFiles">
-            <div class="input-group">
-                <InputText class="form-control"
-                           @bind-Value="startHereInputModel.TaskPrompt"
-                           placeholder="Example: I need to change auth"
-                           disabled="@isLoading"
-                           aria-label="Task prompt" />
-                <button type="submit" class="btn btn-outline-primary" disabled="@(isLoading || string.IsNullOrWhiteSpace(startHereInputModel.TaskPrompt))">
-                    Suggest files
-                </button>
+    else
+    {
+        <div class="chat-body">
+            @* Repository selector *@
+            <div class="repo-selector">
+                <label class="form-label" for="repo-select">Repository</label>
+                <select id="repo-select" class="form-select form-select-sm" @onchange="OnRepoSelectionChanged">
+                    @foreach (var repo in indexedRepos)
+                    {
+                        <option value="@($"{repo.Owner}/{repo.Repository}")" selected="@(selectedOwner == repo.Owner && selectedRepository == repo.Repository)">
+                            @repo.Owner/@repo.Repository@(repo.State == RepositoryIndexingState.Running ? " (indexing…)" : string.Empty)
+                        </option>
+                    }
+                </select>
             </div>
-        </EditForm>
 
-        @if (!string.IsNullOrWhiteSpace(startHereMessage))
-        {
-            <p class="text-muted mt-2 mb-0">@startHereMessage</p>
-        }
-
-        @if (startHereSuggestions.Count > 0)
-        {
-            <ul class="start-here-list mt-3 mb-0">
-                @foreach (var suggestion in startHereSuggestions)
-                {
-                    <li>
-                        <a href="https://github.com/@selectedOwner/@selectedRepository/blob/HEAD/@suggestion.Path"
-                           target="_blank"
-                           rel="noopener noreferrer">@suggestion.Path</a>
-                        <div class="text-muted">@suggestion.Reason</div>
-                    </li>
-                }
-            </ul>
-        }
-    </div>
-
-    @* Message list *@
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <span class="text-muted small">
-            @if (messages.Count > 0)
+            @if (selectedRepositoryStatus?.State == RepositoryIndexingState.Running)
             {
-                <span>@messages.Count message@(messages.Count == 1 ? "" : "s") in this conversation</span>
-            }
-        </span>
-        @if (messages.Count > 0)
-        {
-            <button class="btn btn-outline-secondary btn-sm" @onclick="NewConversationAsync" disabled="@isLoading">
-                New conversation
-            </button>
-        }
-    </div>
-
-    <div class="message-list" aria-live="polite" aria-label="Chat messages">
-        @if (messages.Count == 0)
-        {
-            <div class="empty-state">
-                <p>Ask a question about <strong>@selectedOwner/@selectedRepository</strong> to get started.</p>
-            </div>
-        }
-        else
-        {
-            @foreach (var msg in messages)
-            {
-                <div class="message-item">
-                    <div class="message-question">
-                        <span class="badge bg-primary me-2">You</span>
-                        @msg.Question
+                <div class="indexing-banner" role="status" aria-live="polite">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong>Repository is still indexing in the background.</strong>
+                        <span class="text-muted small">Answers may improve as more files are processed.</span>
                     </div>
-
-                    @if (msg.IsLoading)
-                    {
-                        <div class="message-answer loading-answer" role="status">
-                            <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-                            Thinking&hellip;
+                    <div class="progress" role="progressbar" aria-label="Repository indexing progress" aria-valuenow="@SelectedRepositoryProgressPercent" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: @($"{SelectedRepositoryProgressPercent}%")">
+                            @SelectedRepositoryProgressPercent%
                         </div>
-                    }
-                    else if (msg.ErrorMessage is not null)
-                    {
-                        <div class="message-answer">
-                            <div class="alert alert-danger mb-0" role="alert">
-                                <strong>Error:</strong> @msg.ErrorMessage
-                            </div>
-                        </div>
-                    }
-                    else if (msg.IsClarification)
-                    {
-                        <div class="message-answer">
-                            <span class="badge bg-warning text-dark me-2">Clarification needed</span>
-                            <span class="answer-text">@msg.Answer</span>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="message-answer">
-                            <span class="badge bg-secondary me-2">Assistant</span>
-                            <span class="answer-text">@msg.Answer</span>
-                        </div>
-
-                        @if (msg.Citations.Count > 0)
-                        {
-                            <div class="citations">
-                                <span class="citations-label">Sources:</span>
-                                @foreach (var citation in msg.Citations)
-                                {
-                                    <a class="citation-link"
-                                       href="https://github.com/@selectedOwner/@selectedRepository/blob/HEAD/@citation.Path#L@citation.StartLine-L@citation.EndLine"
-                                       target="_blank"
-                                       rel="noopener noreferrer"
-                                       title="@citation.Path lines @citation.StartLine–@citation.EndLine">
-                                        @citation.Path
-                                        <span class="citation-lines">(L@citation.StartLine–@citation.EndLine)</span>
-                                    </a>
-                                }
-                            </div>
-                        }
-                    }
+                    </div>
+                    <div class="form-text mt-2 mb-0">
+                        Processed @selectedRepositoryStatus.ProcessedFileCount of @selectedRepositoryStatus.TotalFileCount files.
+                        Embedded @selectedRepositoryStatus.EmbeddedChunkCount chunks.
+                    </div>
                 </div>
             }
-        }
-    </div>
 
-    @* Chat input *@
-    <div class="chat-input-area">
-        <EditForm Model="inputModel" OnSubmit="SendMessage">
-            <div class="input-group">
-                <InputText id="chat-question"
-                           class="form-control"
-                           @bind-Value="inputModel.Question"
-                           placeholder="Ask a question about this repository…"
-                           disabled="@isLoading"
-                           aria-label="Question" />
-                <button type="submit" class="btn btn-primary" disabled="@(isLoading || string.IsNullOrWhiteSpace(inputModel.Question))">
-                    @if (isLoading)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-                    }
-                    Send
-                </button>
+            <div class="start-here-panel">
+                <h2 class="h5 mb-1">Where should I start?</h2>
+                <p class="text-muted mb-2" style="font-size:13px;">Describe what you need to change, then get suggested files to read first.</p>
+
+                <EditForm Model="startHereInputModel" OnSubmit="SuggestStartingFiles">
+                    <div class="input-group">
+                        <InputText class="form-control form-control-sm"
+                                   @bind-Value="startHereInputModel.TaskPrompt"
+                                   placeholder="Example: I need to change auth"
+                                   disabled="@isLoading"
+                                   aria-label="Task prompt" />
+                        <button type="submit" class="btn btn-outline-primary btn-sm" disabled="@(isLoading || string.IsNullOrWhiteSpace(startHereInputModel.TaskPrompt))">
+                            Suggest files
+                        </button>
+                    </div>
+                </EditForm>
+
+                @if (!string.IsNullOrWhiteSpace(startHereMessage))
+                {
+                    <p class="text-muted mt-2 mb-0" style="font-size:12px;">@startHereMessage</p>
+                }
+
+                @if (startHereSuggestions.Count > 0)
+                {
+                    <ul class="start-here-list mt-2 mb-0">
+                        @foreach (var suggestion in startHereSuggestions)
+                        {
+                            <li>
+                                <a href="https://github.com/@selectedOwner/@selectedRepository/blob/HEAD/@suggestion.Path"
+                                   target="_blank"
+                                   rel="noopener noreferrer">@suggestion.Path</a>
+                                <div class="text-muted" style="font-size:12px;">@suggestion.Reason</div>
+                            </li>
+                        }
+                    </ul>
+                }
             </div>
-        </EditForm>
-    </div>
-}
+
+            <div class="message-list-controls">
+                <span class="text-muted small">
+                    @if (messages.Count > 0)
+                    {
+                        <span>@messages.Count message@(messages.Count == 1 ? "" : "s") in this conversation</span>
+                    }
+                </span>
+                @if (messages.Count > 0)
+                {
+                    <button class="btn btn-outline-secondary btn-sm" @onclick="NewConversationAsync" disabled="@isLoading">
+                        New conversation
+                    </button>
+                }
+            </div>
+
+            <div class="message-list-wrapper" aria-live="polite" aria-label="Chat messages">
+                @if (messages.Count == 0)
+                {
+                    <div class="empty-state">
+                        <p>Ask a question about <strong>@selectedOwner/@selectedRepository</strong> to get started.</p>
+                    </div>
+                }
+                else
+                {
+                    @foreach (var msg in messages)
+                    {
+                        <div class="message-item">
+                            <div class="message-question">
+                                <span class="badge bg-primary">You</span>
+                                @msg.Question
+                            </div>
+
+                            @if (msg.IsLoading)
+                            {
+                                <div class="message-answer loading-answer" role="status">
+                                    <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+                                    Thinking&hellip;
+                                </div>
+                            }
+                            else if (msg.ErrorMessage is not null)
+                            {
+                                <div class="message-answer">
+                                    <div class="alert alert-danger mb-0" role="alert">
+                                        <strong>Error:</strong> @msg.ErrorMessage
+                                    </div>
+                                </div>
+                            }
+                            else if (msg.IsClarification)
+                            {
+                                <div class="message-answer">
+                                    <span class="badge bg-warning me-2">Clarification needed</span>
+                                    <span class="answer-text">@msg.Answer</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="message-answer">
+                                    <span class="badge bg-secondary me-2">Assistant</span>
+                                    <span class="answer-text">@msg.Answer</span>
+                                </div>
+
+                                @if (msg.Citations.Count > 0)
+                                {
+                                    <div class="citations">
+                                        <span class="citations-label">Sources:</span>
+                                        @foreach (var citation in msg.Citations)
+                                        {
+                                            <a class="citation-link"
+                                               href="https://github.com/@selectedOwner/@selectedRepository/blob/HEAD/@citation.Path#L@citation.StartLine-L@citation.EndLine"
+                                               target="_blank"
+                                               rel="noopener noreferrer"
+                                               title="@citation.Path lines @citation.StartLine–@citation.EndLine">
+                                                @citation.Path
+                                                <span class="citation-lines">(L@citation.StartLine–@citation.EndLine)</span>
+                                            </a>
+                                        }
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        @* Sticky chat input *@
+        <div class="chat-input-area">
+            <EditForm Model="inputModel" OnSubmit="SendMessage">
+                <div class="input-group">
+                    <InputText id="chat-question"
+                               class="form-control"
+                               @bind-Value="inputModel.Question"
+                               placeholder="Ask a question about this repository…"
+                               disabled="@isLoading"
+                               aria-label="Question" />
+                    <button type="submit" class="btn btn-primary" disabled="@(isLoading || string.IsNullOrWhiteSpace(inputModel.Question))">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                        }
+                        Send
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    }
+</div>
 
 @code {
     // -------------------------------------------------------------------------

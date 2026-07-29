@@ -2,71 +2,73 @@
 @rendermode InteractiveServer
 @inject IRepositoryIndexingStatusStore IndexingStatusStore
 
-<PageTitle>Repo Overview</PageTitle>
+<PageTitle>Repo Overview — onboard-me</PageTitle>
 
-<h1>Repo Overview</h1>
+<div class="page-scroll-area">
+    <h1>Repo Overview</h1>
 
-@if (!hasLoadedState)
-{
-    <p class="text-muted">Loading...</p>
-}
-else if (indexedRepos.Count == 0)
-{
-    <div class="empty-state">
-        <p class="lead">No repository has been indexed yet.</p>
-        <p>Go to <a href="/repo-setup">Repo Setup</a> to index a GitHub repository first.</p>
-    </div>
-}
-else if (selectedOverview is not null)
-{
-    <div class="mb-3">
-        <label class="form-label fw-semibold" for="repo-overview-select">Repository</label>
-        <select id="repo-overview-select" class="form-select" @onchange="OnRepoSelectionChanged">
-            @foreach (var repo in indexedRepos)
-            {
-                <option value="@($"{repo.Owner}/{repo.Repository}")" selected="@(repo.Owner == selectedOwner && repo.Repository == selectedRepository)">
-                    @repo.Owner/@repo.Repository
-                </option>
-            }
-        </select>
-    </div>
-
-    <div class="mb-3">
-        <span class="badge text-bg-secondary me-2">Indexing: @selectedOverview.State</span>
-        <span class="text-muted">Last updated: @selectedOverview.LastUpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")</span>
-    </div>
-
-    <p>@selectedOverview.Summary</p>
-
-    <h2 class="h4 mt-4">Top-level structure</h2>
-    <ul class="list-group mb-4">
-        @foreach (var item in selectedOverview.TopLevelItems)
-        {
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                <span><strong>@item.Name</strong> <span class="text-muted">(@item.Kind)</span></span>
-                <span class="badge text-bg-light">@item.FileCount file(s)</span>
-            </li>
-        }
-    </ul>
-
-    <h2 class="h4">Notable files</h2>
-    @if (selectedOverview.NotableFiles.Count == 0)
+    @if (!hasLoadedState)
     {
-        <p class="text-muted">No notable files were detected.</p>
+        <p class="text-muted">Loading…</p>
     }
-    else
+    else if (indexedRepos.Count == 0)
     {
-        <ul class="list-group">
-            @foreach (var notable in selectedOverview.NotableFiles)
+        <div class="empty-state-page">
+            <p class="lead">No repository has been indexed yet.</p>
+            <p>Go to <a href="/repo-setup">Repo Setup</a> to index a GitHub repository first.</p>
+        </div>
+    }
+    else if (selectedOverview is not null)
+    {
+        <div class="mb-3">
+            <label class="form-label" for="repo-overview-select">Repository</label>
+            <select id="repo-overview-select" class="form-select" style="max-width: 380px;" @onchange="OnRepoSelectionChanged">
+                @foreach (var repo in indexedRepos)
+                {
+                    <option value="@($"{repo.Owner}/{repo.Repository}")" selected="@(repo.Owner == selectedOwner && repo.Repository == selectedRepository)">
+                        @repo.Owner/@repo.Repository
+                    </option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <span class="badge text-bg-secondary me-2">Indexing: @selectedOverview.State</span>
+            <span class="text-muted">Last updated: @selectedOverview.LastUpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")</span>
+        </div>
+
+        <p>@selectedOverview.Summary</p>
+
+        <h2 class="h4 mt-4">Top-level structure</h2>
+        <ul class="list-group mb-4">
+            @foreach (var item in selectedOverview.TopLevelItems)
             {
                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <code>@notable.Path</code>
-                    <span class="badge text-bg-info">@notable.Category</span>
+                    <span><strong>@item.Name</strong> <span class="text-muted">(@item.Kind)</span></span>
+                    <span class="badge text-bg-light">@item.FileCount file(s)</span>
                 </li>
             }
         </ul>
+
+        <h2 class="h4">Notable files</h2>
+        @if (selectedOverview.NotableFiles.Count == 0)
+        {
+            <p class="text-muted">No notable files were detected.</p>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var notable in selectedOverview.NotableFiles)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <code>@notable.Path</code>
+                        <span class="badge text-bg-info">@notable.Category</span>
+                    </li>
+                }
+            </ul>
+        }
     }
-}
+</div>
 
 @code {
     private bool hasLoadedState;

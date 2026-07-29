@@ -1,7 +1,9 @@
 ﻿@page "/"
+@inject NavigationManager Nav
 
-<PageTitle>Home</PageTitle>
-
-<h1>onboard-me</h1>
-
-<p>Start by connecting a repository, then use chat and the repo overview to onboard faster.</p>
+@code {
+    protected override void OnInitialized()
+    {
+        Nav.NavigateTo("/chat", replace: true);
+    }
+}
