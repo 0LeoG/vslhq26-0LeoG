@@ -91,12 +91,32 @@ cd vslhq26-0LeoG
 # Restore dependencies
 dotnet restore onboard-me.sln
 
-# Configure local settings (shape only; do not commit real secrets)
-# See: src/OnboardMe.Web/appsettings.Example.json
-# You can use .NET user secrets or environment variables for sensitive values.
+# Initialize local user secrets for the web project
+dotnet user-secrets init --project src/OnboardMe.Web/OnboardMe.Web.csproj
+
+# Set GitHub OAuth secrets locally
+dotnet user-secrets set "GitHub:ClientId" "your-github-client-id" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+dotnet user-secrets set "GitHub:ClientSecret" "your-github-client-secret" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+
+# Optional: override the callback path if needed
+dotnet user-secrets set "GitHub:CallbackPath" "/signin-github" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+
+# Optional: add Azure OpenAI settings locally
+dotnet user-secrets set "AzureOpenAI:Endpoint" "https://your-resource.openai.azure.com/" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+dotnet user-secrets set "AzureOpenAI:ApiKey" "your-azure-openai-api-key" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+dotnet user-secrets set "AzureOpenAI:ChatDeployment" "your-chat-deployment" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+dotnet user-secrets set "AzureOpenAI:EmbeddingsDeployment" "your-embeddings-deployment" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+
+# Optional: add vector index settings locally
+dotnet user-secrets set "VectorIndex:Provider" "your-vector-provider" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+dotnet user-secrets set "VectorIndex:ConnectionString" "your-vector-connection-string" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+dotnet user-secrets set "VectorIndex:IndexName" "your-vector-index-name" --project src/OnboardMe.Web/OnboardMe.Web.csproj
 
 # Run the app
 dotnet run --project src/OnboardMe.Web/OnboardMe.Web.csproj
+
+# Or force the HTTPS launch profile explicitly
+dotnet run --project src/OnboardMe.Web/OnboardMe.Web.csproj --launch-profile https
 ```
 
 ### Configuration
@@ -104,6 +124,7 @@ dotnet run --project src/OnboardMe.Web/OnboardMe.Web.csproj
 The app is expected to need configuration for:
 
 - GitHub client ID / client secret
+- GitHub OAuth callback path (default: `/signin-github`)
 - Azure OpenAI endpoint
 - Azure OpenAI API key
 - Azure OpenAI chat deployment name
@@ -111,6 +132,15 @@ The app is expected to need configuration for:
 - Vector index or search service connection settings
 
 Do not commit secrets. Use local environment variables, .NET user secrets, or example config files that only show the expected shape.
+
+For local development, prefer `.NET user secrets`:
+
+- Keep `src/OnboardMe.Web/appsettings.json` free of secrets.
+- Use `src/OnboardMe.Web/appsettings.Example.json` only as a shape reference.
+- Store real values outside the repo with `dotnet user-secrets`.
+- Inspect local secrets with `dotnet user-secrets list --project src/OnboardMe.Web/OnboardMe.Web.csproj`.
+
+For GitHub OAuth, configure your app callback URL to `https://localhost:<port>/signin-github` (or your configured callback path).
 
 ## Demo (required)
 
