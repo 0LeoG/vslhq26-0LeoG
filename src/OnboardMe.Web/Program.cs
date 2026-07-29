@@ -34,6 +34,7 @@ builder.Services.AddHttpClient(AzureOpenAiChatService.AzureOpenAiChatClientName)
 builder.Services.Configure<AzureOpenAiEmbeddingsOptions>(builder.Configuration.GetSection(AzureOpenAiEmbeddingsOptions.SectionName));
 builder.Services.AddSingleton<IRepositoryIndexingStatusStore, InMemoryRepositoryIndexingStatusStore>();
 builder.Services.AddSingleton<IRepositoryEmbeddingStore, InMemoryRepositoryEmbeddingStore>();
+builder.Services.AddSingleton<IConversationStore, InMemoryConversationStore>();
 builder.Services.AddSingleton<IAzureOpenAiEmbeddingService, AzureOpenAiEmbeddingService>();
 builder.Services.AddSingleton<IAzureOpenAiChatService, AzureOpenAiChatService>();
 builder.Services.AddSingleton<IRepositoryIngestionService, RepositoryIngestionService>();
@@ -265,7 +266,7 @@ app.MapPost("/repos/{owner}/{repository}/chat", async (
     OnboardMe.Web.Services.RepoIngestion.ChatAnswer chatAnswer;
     try
     {
-        chatAnswer = await chatService.AnswerAsync(owner, repository, body.Question, contextChunks, cancellationToken);
+        chatAnswer = await chatService.AnswerAsync(owner, repository, body.Question, contextChunks, cancellationToken: cancellationToken);
     }
     catch (Exception ex)
     {

@@ -91,7 +91,7 @@ public class AzureOpenAiChatServiceTests
     }
 
     [Fact]
-    public async Task AnswerAsync_SerializesMaxTokens_AsMaxTokensSnakeCase()
+    public async Task AnswerAsync_SerializesMaxTokens_AsMaxCompletionTokensSnakeCase()
     {
         string? requestBody = null;
 
@@ -109,8 +109,9 @@ public class AzureOpenAiChatServiceTests
         _ = await service.AnswerAsync("owner", "repo", "question?", BuildChunks("a.cs", 1, 5));
 
         Assert.NotNull(requestBody);
-        Assert.Contains("\"max_tokens\"", requestBody!, StringComparison.Ordinal);
+        Assert.Contains("\"max_completion_tokens\"", requestBody!, StringComparison.Ordinal);
         Assert.DoesNotContain("\"maxTokens\"", requestBody!, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"max_tokens\"", requestBody!, StringComparison.Ordinal);
     }
 
     // -------------------------------------------------------------------------
@@ -148,6 +149,135 @@ public class AzureOpenAiChatServiceTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.AnswerAsync("owner", "repo", "question?", BuildChunks("a.cs", 1, 5)));
+    }
+
+    // -------------------------------------------------------------------------
+    // Multi-turn / conversation history
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task AnswerAsync_IncludesHistoryMessages_InRequest()
+    {
+        string? requestBody = null;
+
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            requestBody = request.Content?.ReadAsStringAsync().GetAwaiter().GetResult();
+            return JsonResponse(new
+            {
+                choices = new[] { new { message = new { content = "Answer with history." } } }
+            });
+        });
+
+        var service = BuildService(handler);
+        var history = new List<ConversationMessage>
+        {
+            new() { Role = ConversationRole.User,      Content = "Previous user question"    },
+            new() { Role = ConversationRole.Assistant, Content = "Previous assistant answer" }
+        };
+
+        _ = await service.AnswerAsync("owner", "repo", "follow-up?", BuildChunks("a.cs", 1, 5), history);
+
+        Assert.NotNull(requestBody);
+        Assert.Contains("Previous user question",    requestBody!, StringComparison.Ordinal);
+        Assert.Contains("Previous assistant answer", requestBody!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnswerAsync_SetsClarificationFlag_WhenResponseStartsWithClarificationPrefix()
+    {
+        var handler = new StubHttpMessageHandler(_ => JsonResponse(new
+        {
+            choices = new[] { new { message = new { content = $"{AzureOpenAiChatService.ClarificationPrefix} Are you asking about the HTTP client or the gRPC client?" } } }
+        }));
+
+        var service = BuildService(handler);
+
+        var result = await service.AnswerAsync("owner", "repo", "which client?", BuildChunks("a.cs", 1, 5));
+
+        Assert.True(result.IsClarification);
+        Assert.Empty(result.Citations);
+        Assert.DoesNotContain(AzureOpenAiChatService.ClarificationPrefix, result.Answer, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AnswerAsync_DoesNotSetClarificationFlag_ForNormalAnswer()
+    {
+        var handler = new StubHttpMessageHandler(_ => JsonResponse(new
+        {
+            choices = new[] { new { message = new { content = "This is a normal answer." } } }
+        }));
+
+        var service = BuildService(handler);
+
+        var result = await service.AnswerAsync("owner", "repo", "question?", BuildChunks("a.cs", 1, 5));
+
+        Assert.False(result.IsClarification);
+    }
+
+    // -------------------------------------------------------------------------
+    // RewriteQueryAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task RewriteQueryAsync_ReturnsOriginalQuestion_WhenHistoryIsEmpty()
+    {
+        var handler = new StubHttpMessageHandler(_ => JsonResponse(new
+        {
+            choices = new[] { new { message = new { content = "should not be called" } } }
+        }));
+
+        var service = BuildService(handler);
+
+        var result = await service.RewriteQueryAsync("What does the App class do?", []);
+
+        Assert.Equal("What does the App class do?", result);
+    }
+
+    [Fact]
+    public async Task RewriteQueryAsync_ReturnsRewrittenQuery_WhenHistoryPresent()
+    {
+        var rewritten = "Where is the dependency injection container configured?";
+        var handler = new StubHttpMessageHandler(_ => JsonResponse(new
+        {
+            choices = new[] { new { message = new { content = rewritten } } }
+        }));
+
+        var service = BuildService(handler);
+        var history = new List<ConversationMessage>
+        {
+            new() { Role = ConversationRole.User,      Content = "How does dependency injection work?" },
+            new() { Role = ConversationRole.Assistant, Content = "It is configured in Program.cs."    }
+        };
+
+        var result = await service.RewriteQueryAsync("Where is that configured?", history);
+
+        Assert.Equal(rewritten, result);
+    }
+
+    [Fact]
+    public async Task RewriteQueryAsync_ReturnsOriginalQuestion_WhenNotConfigured()
+    {
+        var handler = new StubHttpMessageHandler(_ => new HttpResponseMessage(System.Net.HttpStatusCode.OK));
+        var service = new AzureOpenAiChatService(
+            new StubHttpClientFactory(new HttpClient(handler)),
+            Options.Create(new AzureOpenAiEmbeddingsOptions
+            {
+                Endpoint = "https://aoai.test/",
+                ApiKey   = "key"
+                // ChatDeployment intentionally omitted → not configured
+            }),
+            NullLogger<AzureOpenAiChatService>.Instance);
+
+        var history = new List<ConversationMessage>
+        {
+            new() { Role = ConversationRole.User, Content = "Some prior question" }
+        };
+
+        // Should not throw — just returns the original question.
+        var result = await service.RewriteQueryAsync("follow-up?", history);
+
+        Assert.Equal("follow-up?", result);
     }
 
     // -------------------------------------------------------------------------

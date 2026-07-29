@@ -5,6 +5,7 @@
 @inject IAzureOpenAiEmbeddingService EmbeddingService
 @inject IRepositoryEmbeddingStore EmbeddingStore
 @inject IAzureOpenAiChatService ChatService
+@inject IConversationStore ConversationStore
 
 <PageTitle>Chat</PageTitle>
 
@@ -94,6 +95,21 @@ else
     </div>
 
     @* Message list *@
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small">
+            @if (messages.Count > 0)
+            {
+                <span>@messages.Count message@(messages.Count == 1 ? "" : "s") in this conversation</span>
+            }
+        </span>
+        @if (messages.Count > 0)
+        {
+            <button class="btn btn-outline-secondary btn-sm" @onclick="NewConversationAsync" disabled="@isLoading">
+                New conversation
+            </button>
+        }
+    </div>
+
     <div class="message-list" aria-live="polite" aria-label="Chat messages">
         @if (messages.Count == 0)
         {
@@ -124,6 +140,13 @@ else
                             <div class="alert alert-danger mb-0" role="alert">
                                 <strong>Error:</strong> @msg.ErrorMessage
                             </div>
+                        </div>
+                    }
+                    else if (msg.IsClarification)
+                    {
+                        <div class="message-answer">
+                            <span class="badge bg-warning text-dark me-2">Clarification needed</span>
+                            <span class="answer-text">@msg.Answer</span>
                         </div>
                     }
                     else
@@ -195,6 +218,9 @@ else
     private string? startHereMessage;
     private CancellationTokenSource? statusPollingCts;
 
+    // Stable per-component session ID used to isolate conversation history in the store.
+    private string sessionId = Guid.NewGuid().ToString("N");
+
     private readonly ChatInputModel inputModel = new();
     private int SelectedRepositoryProgressPercent => selectedRepositoryStatus?.TotalFileCount > 0
         ? Math.Clamp((int)((double)selectedRepositoryStatus.ProcessedFileCount / selectedRepositoryStatus.TotalFileCount * 100), 0, 100)
@@ -216,7 +242,7 @@ else
     // Event handlers
     // -------------------------------------------------------------------------
 
-    private void OnRepoSelectionChanged(ChangeEventArgs e)
+    private async Task OnRepoSelectionChanged(ChangeEventArgs e)
     {
         var value = e.Value?.ToString() ?? string.Empty;
         var slash = value.IndexOf('/');
@@ -230,8 +256,8 @@ else
             string.Equals(repo.Owner, selectedOwner, StringComparison.OrdinalIgnoreCase)
             && string.Equals(repo.Repository, selectedRepository, StringComparison.OrdinalIgnoreCase));
 
-        // Clear conversation when the user switches repos.
-        messages.Clear();
+        // Clear conversation state when the user switches repos.
+        await ClearConversationStateAsync();
         startHereSuggestions = [];
         startHereMessage = null;
     }
@@ -262,7 +288,13 @@ else
                 return;
             }
 
-            // Step 1: embed the question.
+            // Load recent conversation history from the store.
+            var history = await ConversationStore.GetHistoryAsync(sessionId, selectedOwner, selectedRepository);
+
+            // Step 1: rewrite follow-up questions into standalone retrieval queries.
+            var retrievalQuery = await ChatService.RewriteQueryAsync(question, history);
+
+            // Step 2: embed the (possibly rewritten) retrieval query.
             var queryChunk = new RepositoryContentChunk
             {
                 ChunkId    = "query:0",
@@ -272,25 +304,32 @@ else
                 Strategy   = "query",
                 StartLine  = 0,
                 EndLine    = 0,
-                Content    = question
+                Content    = retrievalQuery
             };
 
             IReadOnlyList<RepositoryChunkEmbeddingRecord> queryEmbeddings;
             queryEmbeddings = await EmbeddingService.GenerateEmbeddingsAsync(
                 selectedOwner, selectedRepository, [queryChunk]);
 
-            // Step 2: retrieve the most relevant chunks.
+            // Step 3: retrieve the most relevant chunks.
             var queryEmbedding = queryEmbeddings[0].Embedding;
             var contextChunks = await EmbeddingStore.SearchByEmbeddingAsync(
                 selectedOwner, selectedRepository, queryEmbedding);
 
-            // Step 3: call the chat model for a grounded answer.
+            // Step 4: call the chat model for a grounded answer, including conversation history.
             var chatAnswer = await ChatService.AnswerAsync(
-                selectedOwner, selectedRepository, question, contextChunks);
+                selectedOwner, selectedRepository, question, contextChunks, history);
 
-            placeholder.IsLoading = false;
-            placeholder.Answer = chatAnswer.Answer;
-            placeholder.Citations = chatAnswer.Citations;
+            placeholder.IsLoading      = false;
+            placeholder.Answer         = chatAnswer.Answer;
+            placeholder.Citations      = chatAnswer.Citations;
+            placeholder.IsClarification = chatAnswer.IsClarification;
+
+            // Persist both sides of the turn to the conversation store.
+            await ConversationStore.AddMessageAsync(sessionId, selectedOwner, selectedRepository,
+                new ConversationMessage { Role = ConversationRole.User, Content = question });
+            await ConversationStore.AddMessageAsync(sessionId, selectedOwner, selectedRepository,
+                new ConversationMessage { Role = ConversationRole.Assistant, Content = chatAnswer.Answer });
         }
         catch (Exception ex)
         {
@@ -302,6 +341,18 @@ else
             isLoading = false;
             StateHasChanged();
         }
+    }
+
+    private async Task NewConversationAsync()
+    {
+        await ClearConversationStateAsync();
+        StateHasChanged();
+    }
+
+    private async Task ClearConversationStateAsync()
+    {
+        messages.Clear();
+        await ConversationStore.ClearAsync(sessionId, selectedOwner, selectedRepository);
     }
 
     private void StartStatusPolling()
@@ -402,6 +453,7 @@ else
         public bool IsLoading { get; set; }
         public string? Answer { get; set; }
         public string? ErrorMessage { get; set; }
+        public bool IsClarification { get; set; }
         public IReadOnlyList<FileCitation> Citations { get; set; } = [];
     }
 
