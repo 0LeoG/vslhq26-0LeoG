@@ -104,6 +104,7 @@ dotnet run --project src/OnboardMe.Web/OnboardMe.Web.csproj
 The app is expected to need configuration for:
 
 - GitHub client ID / client secret
+- GitHub OAuth callback path (default: `/signin-github`)
 - Azure OpenAI endpoint
 - Azure OpenAI API key
 - Azure OpenAI chat deployment name
@@ -111,6 +112,8 @@ The app is expected to need configuration for:
 - Vector index or search service connection settings
 
 Do not commit secrets. Use local environment variables, .NET user secrets, or example config files that only show the expected shape.
+
+For GitHub OAuth, configure your app callback URL to `https://localhost:<port>/signin-github` (or your configured callback path).
 
 ## Demo (required)
 
