@@ -11,6 +11,7 @@ public sealed class RepositoryIngestionService(
     IRepositoryIndexingStatusStore statusStore,
     ILogger<RepositoryIngestionService> logger) : IRepositoryIngestionService
 {
+    // First-pass ingestion keeps each file under 512 KB so fetches stay reliable.
     private const int MaxFileSizeBytes = 512 * 1024;
 
     public async Task<RepositoryIndexingStatus> IngestRepositoryAsync(string owner, string repository, CancellationToken cancellationToken = default)
