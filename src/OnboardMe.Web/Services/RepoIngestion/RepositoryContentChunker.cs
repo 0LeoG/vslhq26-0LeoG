@@ -145,7 +145,12 @@ public static class RepositoryContentChunker
                 endLine = currentStart;
             }
 
-            yield return new LineRange(currentStart, endLine);
+            var trimmedEndLine = TrimTrailingBlankLines(lines, currentStart, endLine);
+            if (trimmedEndLine >= currentStart)
+            {
+                yield return new LineRange(currentStart, trimmedEndLine);
+            }
+
             currentStart = endLine + 1;
         }
     }
@@ -163,6 +168,16 @@ public static class RepositoryContentChunker
         }
 
         return builder.ToString();
+    }
+
+    private static int TrimTrailingBlankLines(string[] lines, int startLine, int endLine)
+    {
+        while (endLine >= startLine && string.IsNullOrWhiteSpace(lines[endLine - 1]))
+        {
+            endLine--;
+        }
+
+        return endLine;
     }
 
     private static ChunkingMode ResolveChunkingMode(string path, string language)

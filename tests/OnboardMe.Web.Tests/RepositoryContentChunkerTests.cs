@@ -14,7 +14,7 @@ public class RepositoryContentChunkerTests
         Assert.Equal(2, chunks.Count);
         Assert.Equal("sha-readme:0", chunks[0].ChunkId);
         Assert.Equal(1, chunks[0].StartLine);
-        Assert.Equal(3, chunks[0].EndLine);
+        Assert.Equal(2, chunks[0].EndLine);
         Assert.Equal("sha-readme:1", chunks[1].ChunkId);
         Assert.Equal(4, chunks[1].StartLine);
         Assert.Equal(5, chunks[1].EndLine);
