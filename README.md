@@ -1,67 +1,121 @@
-# Project Name
+# onboard-me
 
-One-sentence description of what your project does.
+A codebase onboarding assistant that helps developers understand an unfamiliar repository with chat, repo mapping, and cited answers.
 
 ## Team
 
-- **Team name (or "Solo"):**
+- **Team name (or "Solo"):** Solo
 - **Members:**
-  - Name (@github-handle)
-  - Name (@github-handle)
+  - LeoG (@0LeoG)
 
 ## Category
 
-- **Primary:** Azure OpenAI/LLM app | Copilot integration | AI agent/workflow automation | .NET business app | Creative application
-- **Secondary (optional):**
+- **Primary:** Copilot integration
+- **Secondary (optional):** Best AI Agent or Workflow Automation
 
 ## What it does
 
-Two to four sentences describing the problem you're solving and how your project addresses it.
+onboard-me is a web app for developers who need to get productive in a codebase they have never seen before. A user connects a GitHub repository, the app ingests the repository structure and selected files, and then builds an onboarding workspace with chat, a repo overview, and task-focused guidance.
+
+The goal is to reduce the time it takes to answer common onboarding questions like where to start, which files matter for a feature, and how major parts of the system fit together. Answers are grounded in retrieved repository context and should point the user back to the relevant files.
 
 ## Architecture
 
-Brief description of the components and how they connect. A diagram (image, mermaid, or ASCII) is welcome.
+The planned architecture is an ASP.NET Core / Blazor web app with server-side Azure OpenAI integration and a RAG pipeline over repository content.
+
+```text
+GitHub repo
+   |
+   v
+Repo ingestion service
+   |
+   +--> metadata + repo map store
+   |
+   +--> chunking pipeline --> embeddings --> vector index
+                                         |
+User question ---------------------------+
+                                         |
+                                         v
+                              retrieval + prompt assembly
+                                         |
+                                         v
+                                  Azure OpenAI answer
+                                         |
+                                         v
+                             Blazor chat + repo overview UI
+```
+
+Main planned components:
+
+- **Blazor web UI** for repo submission, chat, and repo overview
+- **ASP.NET Core backend services** for GitHub ingestion, indexing, and orchestration
+- **Chunking and retrieval pipeline** for code and documentation
+- **Azure OpenAI** for embeddings and chat completions
+- **Vector index** for semantic search over repository chunks
+- **Metadata store** for repo state, indexing status, and workspace data
 
 ## Tech stack
 
-- Languages:
-- Frameworks/libraries:
-- AI models/services:
-- Hosting:
+- **Languages:** C#, SQL
+- **Frameworks/libraries:** ASP.NET Core, Blazor
+- **AI models/services:** Azure OpenAI for embeddings and chat completions
+- **Hosting:** TBD
 
 ## Getting started
 
 ### Prerequisites
 
-- List required SDKs, runtimes, accounts, if any API Keys are needed (but not the value of the key itself)
+- .NET SDK 8 or later
+- A GitHub account
+- GitHub OAuth app or equivalent GitHub auth setup for private repo access
+- Azure OpenAI resource with:
+  - a chat model deployment
+  - an embeddings model deployment
+- A vector-capable storage option for retrieval
 
 ### Setup
 
 ```bash
 # Clone the repo
-git clone https://github.com/<owner>/<repo>.git
-cd <repo>
+git clone https://github.com/0LeoG/vslhq26-0LeoG.git
+cd vslhq26-0LeoG
 
-# Install dependencies
-# Configure environment variables (see .env.example)
+# Restore dependencies
+dotnet restore
 
-# Run
+# Configure local settings
+# Add environment variables or user secrets for GitHub auth and Azure OpenAI
+
+# Run the app
+dotnet run
 ```
 
 ### Configuration
 
-List the environment variables or config files needed. Do NOT commit secrets. Use `.env.example` to show the shape.
+The app is expected to need configuration for:
+
+- GitHub client ID / client secret
+- Azure OpenAI endpoint
+- Azure OpenAI API key
+- Azure OpenAI chat deployment name
+- Azure OpenAI embeddings deployment name
+- Vector index or search service connection settings
+
+Do not commit secrets. Use local environment variables, .NET user secrets, or example config files that only show the expected shape.
 
 ## Demo (required)
 
-- Video file in this repo (preferred): `./demo/demo.mp4` (or similar path)
-- Video link (YouTube, Loom, etc.) if not committed to repo:
-- Deployed URL (if any):
+- **Video file in this repo (preferred):** `./demo/demo.mp4`
+- **Video link (YouTube, Loom, etc.) if not committed to repo:**
+- **Deployed URL (if any):**
 
 ## Known limitations
 
-Be honest about what doesn't work yet. Judges appreciate this.
+- The repository is still in the setup phase and the full application is not implemented yet.
+- Private repository support depends on the final GitHub authentication flow.
+- Retrieval quality will depend on chunking, metadata quality, and the vector storage approach selected during implementation.
+- The repo map will likely start as a lightweight structural view before any deeper code graph analysis is added.
 
 ## License
 
-MIT (or your choice)
+MIT
