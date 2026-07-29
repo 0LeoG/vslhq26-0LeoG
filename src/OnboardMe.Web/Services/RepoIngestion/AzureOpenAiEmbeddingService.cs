@@ -27,8 +27,9 @@ public sealed class AzureOpenAiEmbeddingService(
         var options = optionsAccessor.Value;
         if (!options.IsConfigured)
         {
-            logger.LogWarning("Azure OpenAI embeddings are not configured. Skipping embedding generation.");
-            return [];
+            var message = "Azure OpenAI embeddings are not configured. Provide Endpoint, ApiKey, and EmbeddingsDeployment before ingesting a repository.";
+            logger.LogWarning(message);
+            throw new InvalidOperationException(message);
         }
 
         var endpoint = options.Endpoint!.TrimEnd('/');

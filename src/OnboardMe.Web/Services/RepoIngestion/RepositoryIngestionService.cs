@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Configuration;
 
 namespace OnboardMe.Web.Services.RepoIngestion;
 
@@ -10,7 +12,9 @@ public sealed class RepositoryIngestionService(
     IRepositoryIndexingStatusStore statusStore,
     IAzureOpenAiEmbeddingService embeddingService,
     IRepositoryEmbeddingStore embeddingStore,
-    ILogger<RepositoryIngestionService> logger) : IRepositoryIngestionService
+    ILogger<RepositoryIngestionService> logger,
+    IHttpContextAccessor httpContextAccessor,
+    IConfiguration configuration) : IRepositoryIngestionService
 {
     public const string GitHubApiClientName = "GitHubApi";
 
@@ -158,34 +162,68 @@ public sealed class RepositoryIngestionService(
         return embeddings.Count;
     }
 
-    private static async Task<GitHubRepositoryMetadata> GetRepositoryMetadataAsync(HttpClient client, string owner, string repository, CancellationToken cancellationToken)
+    private async Task<GitHubRepositoryMetadata> GetRepositoryMetadataAsync(HttpClient client, string owner, string repository, CancellationToken cancellationToken)
     {
-        using var response = await client.GetAsync($"repos/{owner}/{repository}", cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"repos/{owner}/{repository}");
+        await AddGitHubAuthenticationAsync(request, cancellationToken);
+
+        using var response = await client.SendAsync(request, cancellationToken);
         await EnsureSuccessStatusCodeAsync(response, owner, repository, cancellationToken);
         return (await response.Content.ReadFromJsonAsync<GitHubRepositoryMetadata>(cancellationToken))
             ?? throw new InvalidOperationException("GitHub repository metadata response was empty.");
     }
 
-    private static async Task<IReadOnlyList<GitHubTreeItem>> GetRepositoryTreeAsync(HttpClient client, string owner, string repository, string branch, CancellationToken cancellationToken)
+    private async Task<IReadOnlyList<GitHubTreeItem>> GetRepositoryTreeAsync(HttpClient client, string owner, string repository, string branch, CancellationToken cancellationToken)
     {
         var branchRef = Uri.EscapeDataString(branch);
-        using var response = await client.GetAsync($"repos/{owner}/{repository}/git/trees/{branchRef}?recursive=1", cancellationToken);
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"repos/{owner}/{repository}/git/trees/{branchRef}?recursive=1");
+        await AddGitHubAuthenticationAsync(request, cancellationToken);
+
+        using var response = await client.SendAsync(request, cancellationToken);
         await EnsureSuccessStatusCodeAsync(response, owner, repository, cancellationToken);
 
         var tree = await response.Content.ReadFromJsonAsync<GitHubTreeResponse>(cancellationToken);
         return tree?.Tree ?? [];
     }
 
-    private static async Task<string> GetBlobContentAsync(HttpClient client, string owner, string repository, string sha, CancellationToken cancellationToken)
+    private async Task<string> GetBlobContentAsync(HttpClient client, string owner, string repository, string sha, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, $"repos/{owner}/{repository}/git/blobs/{sha}");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.raw"));
+        await AddGitHubAuthenticationAsync(request, cancellationToken);
 
         using var response = await client.SendAsync(request, cancellationToken);
         await EnsureSuccessStatusCodeAsync(response, owner, repository, cancellationToken);
 
         var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
         return Encoding.UTF8.GetString(bytes);
+    }
+
+    private async Task AddGitHubAuthenticationAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var accessToken = await ResolveGitHubAccessTokenAsync(cancellationToken);
+        GitHubAuthenticationHelper.ApplyAuthorization(request, accessToken);
+    }
+
+    private async Task<string?> ResolveGitHubAccessTokenAsync(CancellationToken cancellationToken)
+    {
+        if (httpContextAccessor.HttpContext is not null)
+        {
+            try
+            {
+                var token = await httpContextAccessor.HttpContext.GetTokenAsync("access_token");
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    return token;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "Unable to read GitHub access token from the current request context.");
+            }
+        }
+
+        return configuration["GitHub:Token"] ?? configuration["GitHub:AccessToken"];
     }
 
     private static async Task EnsureSuccessStatusCodeAsync(HttpResponseMessage response, string owner, string repository, CancellationToken cancellationToken)

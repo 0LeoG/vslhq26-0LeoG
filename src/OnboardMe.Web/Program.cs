@@ -22,6 +22,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorization();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient(RepositoryIngestionService.GitHubApiClientName, client =>
 {
     client.BaseAddress = new Uri("https://api.github.com/");

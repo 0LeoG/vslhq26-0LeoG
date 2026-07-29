@@ -78,6 +78,10 @@
         }
 
         successMessage = $"Indexed {status.IndexedCount} files, skipped {status.SkippedCount}, failed {status.FailedCount}, embedded {status.EmbeddedChunkCount} chunks.";
+        if (status.State == RepositoryIndexingState.CompletedWithErrors && !string.IsNullOrWhiteSpace(status.ErrorMessage))
+        {
+            errorMessage = status.ErrorMessage;
+        }
         formModel.RepositoryUrl = normalizedUrl;
     }
 

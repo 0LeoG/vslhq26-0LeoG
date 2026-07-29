@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using OnboardMe.Web.Services.RepoIngestion;
@@ -80,7 +82,9 @@ public class RepositoryIngestionServiceTests
                 }),
                 NullLogger<AzureOpenAiEmbeddingService>.Instance),
             new InMemoryRepositoryEmbeddingStore(),
-            NullLogger<RepositoryIngestionService>.Instance);
+            NullLogger<RepositoryIngestionService>.Instance,
+            new HttpContextAccessor(),
+            new ConfigurationBuilder().AddInMemoryCollection().Build());
 
         var result = await service.IngestRepositoryAsync("octocat", "hello-world");
 
@@ -173,13 +177,83 @@ public class RepositoryIngestionServiceTests
                 }),
                 NullLogger<AzureOpenAiEmbeddingService>.Instance),
             new InMemoryRepositoryEmbeddingStore(),
-            NullLogger<RepositoryIngestionService>.Instance);
+            NullLogger<RepositoryIngestionService>.Instance,
+            new HttpContextAccessor(),
+            new ConfigurationBuilder().AddInMemoryCollection().Build());
 
         await service.IngestRepositoryAsync("octocat", "hello-world");
         var embeddedCount = await service.RegenerateEmbeddingsAsync("octocat", "hello-world");
 
         Assert.Equal(1, embeddedCount);
         Assert.Equal(2, embeddingCalls);
+    }
+
+    [Fact]
+    public async Task IngestRepositoryAsync_ReportsEmbeddingConfigurationProblems()
+    {
+        var handler = new StubHttpMessageHandler(request =>
+        {
+            var pathAndQuery = request.RequestUri?.PathAndQuery ?? string.Empty;
+
+            if (request.Method == HttpMethod.Get && pathAndQuery == "/repos/octocat/hello-world")
+            {
+                return JsonResponse(new { default_branch = "main" });
+            }
+
+            if (request.Method == HttpMethod.Get && pathAndQuery == "/repos/octocat/hello-world/git/trees/main?recursive=1")
+            {
+                return JsonResponse(new
+                {
+                    tree = new[]
+                    {
+                        new { path = "src/App.cs", type = "blob", sha = "sha-app", size = 50 }
+                    }
+                });
+            }
+
+            if (request.Method == HttpMethod.Get && pathAndQuery == "/repos/octocat/hello-world/git/blobs/sha-app")
+            {
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("public class App {}")
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.NotFound);
+        });
+
+        var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://api.github.com/")
+        };
+
+        var service = new RepositoryIngestionService(
+            new StubHttpClientFactory(httpClient),
+            new InMemoryRepositoryIndexingStatusStore(),
+            new AzureOpenAiEmbeddingService(
+                new StubHttpClientFactory(httpClient),
+                Options.Create(new AzureOpenAiEmbeddingsOptions()),
+                NullLogger<AzureOpenAiEmbeddingService>.Instance),
+            new InMemoryRepositoryEmbeddingStore(),
+            NullLogger<RepositoryIngestionService>.Instance,
+            new HttpContextAccessor(),
+            new ConfigurationBuilder().AddInMemoryCollection().Build());
+
+        var result = await service.IngestRepositoryAsync("octocat", "hello-world");
+
+        Assert.Equal(RepositoryIndexingState.CompletedWithErrors, result.State);
+        Assert.Contains("Azure OpenAI embeddings", result.ErrorMessage);
+    }
+
+    [Fact]
+    public void ApplyAuthorization_SetsBearerHeaderWhenTokenIsProvided()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/repos/octocat/hello-world");
+
+        GitHubAuthenticationHelper.ApplyAuthorization(request, "github-token");
+
+        Assert.Equal("Bearer", request.Headers.Authorization?.Scheme);
+        Assert.Equal("github-token", request.Headers.Authorization?.Parameter);
     }
 
     private static HttpResponseMessage JsonResponse<T>(T payload)

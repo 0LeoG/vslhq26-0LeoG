@@ -108,6 +108,9 @@ dotnet user-secrets set "AzureOpenAI:ChatDeployment" "your-chat-deployment" --pr
 dotnet user-secrets set "AzureOpenAI:EmbeddingsDeployment" "your-embeddings-deployment" --project src/OnboardMe.Web/OnboardMe.Web.csproj
 dotnet user-secrets set "AzureOpenAI:ApiVersion" "2024-02-01" --project src/OnboardMe.Web/OnboardMe.Web.csproj
 
+# Optional: add a GitHub personal access token if you hit rate limits
+dotnet user-secrets set "GitHub:AccessToken" "your-github-personal-access-token" --project src/OnboardMe.Web/OnboardMe.Web.csproj
+
 # Optional: add vector index settings locally
 dotnet user-secrets set "VectorIndex:Provider" "your-vector-provider" --project src/OnboardMe.Web/OnboardMe.Web.csproj
 dotnet user-secrets set "VectorIndex:ConnectionString" "your-vector-connection-string" --project src/OnboardMe.Web/OnboardMe.Web.csproj
@@ -126,6 +129,7 @@ The app is expected to need configuration for:
 
 - GitHub client ID / client secret
 - GitHub OAuth callback path (default: `/signin-github`)
+- Optional GitHub personal access token (helps avoid GitHub API rate limits)
 - Azure OpenAI endpoint
 - Azure OpenAI API key
 - Azure OpenAI chat deployment name
