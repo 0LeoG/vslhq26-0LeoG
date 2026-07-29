@@ -84,7 +84,7 @@ public sealed class AzureOpenAiChatService(
                     var answerText = await ParseAnswerAsync(response, cancellationToken);
                     logger.LogInformation(
                         "Chat answer generated for {Owner}/{Repository} ({CitationCount} citations).",
-                        owner, repository, citations.Count);
+                        SanitizeLogValue(owner), SanitizeLogValue(repository), citations.Count);
                     return new ChatAnswer { Answer = answerText, Citations = citations };
                 }
 
@@ -218,6 +218,13 @@ public sealed class AzureOpenAiChatService(
         => statusCode == HttpStatusCode.RequestTimeout
            || statusCode == (HttpStatusCode)429
            || (int)statusCode >= 500;
+
+    /// <summary>
+    /// Strips CR and LF characters from a log value to prevent log-forging attacks.
+    /// </summary>
+    private static string SanitizeLogValue(string value)
+        => value.Replace("\r", string.Empty, StringComparison.Ordinal)
+                .Replace("\n", string.Empty, StringComparison.Ordinal);
 
     // -------------------------------------------------------------------------
     // Private API DTOs
