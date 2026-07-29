@@ -38,12 +38,6 @@ builder.Services.AddSingleton<IAzureOpenAiEmbeddingService, AzureOpenAiEmbedding
 builder.Services.AddSingleton<IAzureOpenAiChatService, AzureOpenAiChatService>();
 builder.Services.AddSingleton<IRepositoryIngestionService, RepositoryIngestionService>();
 
-var githubClientId = builder.Configuration[GitHubClientIdConfigKey];
-var githubClientSecret = builder.Configuration[GitHubClientSecretConfigKey];
-var githubCallbackPath = builder.Configuration[GitHubCallbackPathConfigKey] ?? DefaultGitHubCallbackPath;
-var githubAuthConfigured = !string.IsNullOrWhiteSpace(githubClientId)
-    && !string.IsNullOrWhiteSpace(githubClientSecret);
-
 var authentication = builder.Services
     .AddAuthentication(options =>
     {
@@ -52,13 +46,58 @@ var authentication = builder.Services
     })
     .AddCookie();
 
-if (githubAuthConfigured)
+AddGitHubOAuth(authentication, builder.Configuration);
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (!app.Environment.IsDevelopment())
 {
-    authentication.AddOAuth(GitHubScheme, options =>
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseHsts();
+}
+app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.UseHttpsRedirection();
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseAntiforgery();
+
+app.MapGet("/auth/signin", HandleSignIn);
+app.MapGet("/auth/signout", HandleSignOut);
+app.MapPost("/repos/{owner}/{repository}/embeddings/rerun", HandleRerunEmbeddings);
+app.MapPost("/repos/{owner}/{repository}/search", HandleSearch);
+app.MapPost("/repos/{owner}/{repository}/chat", HandleChat);
+
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+
+app.Run();
+
+// --- Helper: GitHub OAuth setup ---
+
+/// <summary>
+/// Registers GitHub OAuth with the authentication builder when credentials are present in configuration.
+/// If <c>GitHub:ClientId</c> or <c>GitHub:ClientSecret</c> are absent the method is a no-op.
+/// </summary>
+static void AddGitHubOAuth(AuthenticationBuilder auth, IConfiguration configuration)
+{
+    var clientId = configuration[GitHubClientIdConfigKey];
+    var clientSecret = configuration[GitHubClientSecretConfigKey];
+    var callbackPath = configuration[GitHubCallbackPathConfigKey] ?? DefaultGitHubCallbackPath;
+
+    if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
     {
-        options.ClientId = githubClientId!;
-        options.ClientSecret = githubClientSecret!;
-        options.CallbackPath = githubCallbackPath;
+        return;
+    }
+
+    auth.AddOAuth(GitHubScheme, options =>
+    {
+        options.ClientId = clientId;
+        options.ClientSecret = clientSecret;
+        options.CallbackPath = callbackPath;
         options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
         options.TokenEndpoint = "https://github.com/login/oauth/access_token";
         options.UserInformationEndpoint = "https://api.github.com/user";
@@ -91,24 +130,15 @@ if (githubAuthConfigured)
     });
 }
 
-var app = builder.Build();
+// --- Endpoint handlers ---
 
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
+/// <summary>Handles GET /auth/signin — initiates a GitHub OAuth challenge.</summary>
+static IResult HandleSignIn(IConfiguration configuration, string? returnUrl)
 {
-    app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+    var clientId = configuration[GitHubClientIdConfigKey];
+    var clientSecret = configuration[GitHubClientSecretConfigKey];
+    var githubAuthConfigured = !string.IsNullOrWhiteSpace(clientId) && !string.IsNullOrWhiteSpace(clientSecret);
 
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseAntiforgery();
-
-app.MapGet("/auth/signin", (HttpContext context, string? returnUrl) =>
-{
     if (!githubAuthConfigured)
     {
         return Results.Problem(
@@ -121,21 +151,23 @@ app.MapGet("/auth/signin", (HttpContext context, string? returnUrl) =>
     return Results.Challenge(
         new AuthenticationProperties { RedirectUri = redirectUri },
         authenticationSchemes: [GitHubScheme]);
-});
+}
 
-app.MapGet("/auth/signout", (string? returnUrl) =>
+/// <summary>Handles GET /auth/signout — signs the user out of the cookie scheme.</summary>
+static IResult HandleSignOut(string? returnUrl)
 {
     var redirectUri = NormalizeReturnUrl(returnUrl);
     return Results.SignOut(
         new AuthenticationProperties { RedirectUri = redirectUri },
         authenticationSchemes: [CookieAuthenticationDefaults.AuthenticationScheme]);
-});
+}
 
-app.MapPost("/repos/{owner}/{repository}/embeddings/rerun", async (
+/// <summary>Handles POST /repos/{owner}/{repository}/embeddings/rerun — regenerates embeddings for a repository.</summary>
+static async Task<IResult> HandleRerunEmbeddings(
     string owner,
     string repository,
     IRepositoryIngestionService repositoryIngestionService,
-    CancellationToken cancellationToken) =>
+    CancellationToken cancellationToken)
 {
     try
     {
@@ -146,18 +178,20 @@ app.MapPost("/repos/{owner}/{repository}/embeddings/rerun", async (
     {
         return Results.NotFound(new { message = ex.Message });
     }
-});
+}
 
-// POST /repos/{owner}/{repository}/search
-// Body: { "query": "user question", "topK": 5 }
-// Converts the question to an embedding and returns the most relevant chunks for that repo.
-app.MapPost("/repos/{owner}/{repository}/search", async (
+/// <summary>
+/// Handles POST /repos/{owner}/{repository}/search.
+/// Body: { "query": "user question", "topK": 5 }
+/// Converts the question to an embedding and returns the most relevant chunks for that repo.
+/// </summary>
+static async Task<IResult> HandleSearch(
     string owner,
     string repository,
     SearchRequest body,
     IAzureOpenAiEmbeddingService embeddingService,
     IRepositoryEmbeddingStore embeddingStore,
-    CancellationToken cancellationToken) =>
+    CancellationToken cancellationToken)
 {
     if (string.IsNullOrWhiteSpace(body.Query))
     {
@@ -167,7 +201,7 @@ app.MapPost("/repos/{owner}/{repository}/search", async (
     var topK = body.TopK is > 0 ? body.TopK.Value : 5;
 
     // Embed the query as a single-chunk synthetic record so we can reuse the embedding service.
-    var queryChunk = new OnboardMe.Web.Services.RepoIngestion.RepositoryContentChunk
+    var queryChunk = new RepositoryContentChunk
     {
         ChunkId = "query:0",
         SourcePath = "__query__",
@@ -179,7 +213,7 @@ app.MapPost("/repos/{owner}/{repository}/search", async (
         Content = body.Query
     };
 
-    IReadOnlyList<OnboardMe.Web.Services.RepoIngestion.RepositoryChunkEmbeddingRecord> queryEmbeddings;
+    IReadOnlyList<RepositoryChunkEmbeddingRecord> queryEmbeddings;
     try
     {
         queryEmbeddings = await embeddingService.GenerateEmbeddingsAsync(owner, repository, [queryChunk], cancellationToken);
@@ -210,19 +244,21 @@ app.MapPost("/repos/{owner}/{repository}/search", async (
             content = r.Chunk.Content
         })
     });
-});
+}
 
-// POST /repos/{owner}/{repository}/chat
-// Body: { "question": "...", "topK": 5 }
-// Retrieves the most relevant chunks, sends them to Azure OpenAI Chat, and returns an answer with file citations.
-app.MapPost("/repos/{owner}/{repository}/chat", async (
+/// <summary>
+/// Handles POST /repos/{owner}/{repository}/chat.
+/// Body: { "question": "...", "topK": 5 }
+/// Retrieves the most relevant chunks, sends them to Azure OpenAI Chat, and returns an answer with file citations.
+/// </summary>
+static async Task<IResult> HandleChat(
     string owner,
     string repository,
     ChatRequest body,
     IAzureOpenAiEmbeddingService embeddingService,
     IRepositoryEmbeddingStore embeddingStore,
     IAzureOpenAiChatService chatService,
-    CancellationToken cancellationToken) =>
+    CancellationToken cancellationToken)
 {
     if (string.IsNullOrWhiteSpace(body.Question))
     {
@@ -232,7 +268,7 @@ app.MapPost("/repos/{owner}/{repository}/chat", async (
     var topK = body.TopK is > 0 ? body.TopK.Value : 5;
 
     // Step 1: embed the question so we can retrieve relevant chunks.
-    var queryChunk = new OnboardMe.Web.Services.RepoIngestion.RepositoryContentChunk
+    var queryChunk = new RepositoryContentChunk
     {
         ChunkId = "query:0",
         SourcePath = "__query__",
@@ -244,7 +280,7 @@ app.MapPost("/repos/{owner}/{repository}/chat", async (
         Content = body.Question
     };
 
-    IReadOnlyList<OnboardMe.Web.Services.RepoIngestion.RepositoryChunkEmbeddingRecord> queryEmbeddings;
+    IReadOnlyList<RepositoryChunkEmbeddingRecord> queryEmbeddings;
     try
     {
         queryEmbeddings = await embeddingService.GenerateEmbeddingsAsync(owner, repository, [queryChunk], cancellationToken);
@@ -262,7 +298,7 @@ app.MapPost("/repos/{owner}/{repository}/chat", async (
     var contextChunks = await embeddingStore.SearchByEmbeddingAsync(owner, repository, queryEmbedding, topK, cancellationToken);
 
     // Step 3: send question + context to the chat model and return a grounded answer.
-    OnboardMe.Web.Services.RepoIngestion.ChatAnswer chatAnswer;
+    ChatAnswer chatAnswer;
     try
     {
         chatAnswer = await chatService.AnswerAsync(owner, repository, body.Question, contextChunks, cancellationToken);
@@ -288,13 +324,9 @@ app.MapPost("/repos/{owner}/{repository}/chat", async (
             endLine = c.EndLine
         })
     });
-});
+}
 
-app.MapStaticAssets();
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
-
-app.Run();
+// --- Utilities ---
 
 static string NormalizeReturnUrl(string? returnUrl)
 {
