@@ -1,0 +1,90 @@
+.empty-state {
+    color: #6c757d;
+    padding: 2rem 0;
+}
+
+.repo-selector {
+    max-width: 400px;
+}
+
+.message-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    margin-bottom: 1.5rem;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+.message-item {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 0.875rem 1rem;
+    background: #fff;
+}
+
+.message-question {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.message-answer {
+    color: #343a40;
+    line-height: 1.6;
+}
+
+.loading-answer {
+    color: #6c757d;
+}
+
+.answer-text {
+    white-space: pre-wrap;
+}
+
+.citations {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e9ecef;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.citations-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-right: 0.25rem;
+}
+
+.citation-link {
+    font-size: 0.8rem;
+    background: #f0f4ff;
+    border: 1px solid #cdd9f5;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.4rem;
+    text-decoration: none;
+    color: #0d6efd;
+    white-space: nowrap;
+}
+
+    .citation-link:hover {
+        background: #dde8ff;
+        text-decoration: underline;
+    }
+
+.citation-lines {
+    color: #6c757d;
+}
+
+.chat-input-area {
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+    padding: 0.75rem 0 0.25rem;
+    border-top: 1px solid #dee2e6;
+}
