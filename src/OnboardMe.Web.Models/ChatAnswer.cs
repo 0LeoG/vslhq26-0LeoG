@@ -1,4 +1,4 @@
-namespace OnboardMe.Web.Services.RepoIngestion;
+namespace OnboardMe.Web.Models;
 
 /// <summary>A grounded answer returned by the chat service.</summary>
 public sealed class ChatAnswer
@@ -10,7 +10,7 @@ public sealed class ChatAnswer
     public required IReadOnlyList<FileCitation> Citations { get; init; }
 
     /// <summary>
-    /// When <see langword="true"/> the model could not produce a grounded answer and instead
+    /// When <see langword="true" /> the model could not produce a grounded answer and instead
     /// returned a focused clarification question. Citations will be empty in this case.
     /// </summary>
     public bool IsClarification { get; init; }

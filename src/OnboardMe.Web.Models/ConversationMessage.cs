@@ -1,4 +1,4 @@
-namespace OnboardMe.Web.Services.RepoIngestion;
+namespace OnboardMe.Web.Models;
 
 /// <summary>The role of the author of a conversation message.</summary>
 public enum ConversationRole

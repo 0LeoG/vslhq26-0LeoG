@@ -1,4 +1,4 @@
-namespace OnboardMe.Web.Services.RepoIngestion;
+namespace OnboardMe.Web.Models;
 
 /// <summary>
 /// Holds a single result from a vector similarity search, pairing a chunk with its cosine similarity score.

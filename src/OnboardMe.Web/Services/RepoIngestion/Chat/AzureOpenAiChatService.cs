@@ -219,7 +219,7 @@ public sealed class AzureOpenAiChatService(
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Produces a deduplicated, ordered list of <see cref="FileCitation"/> objects
+    /// Produces a deduplicated, ordered list of <see cref="FileCitation" /> objects
     /// from the retrieved chunks, preserving relevance order.
     /// </summary>
     private static IReadOnlyList<FileCitation> BuildCitations(IReadOnlyList<VectorSearchResult> chunks)
@@ -318,29 +318,20 @@ public sealed class AzureOpenAiChatService(
             $"Azure OpenAI chat request failed with {(int?)lastStatusCode} {lastStatusCode}: {lastDetails}");
     }
 
-    // -------------------------------------------------------------------------
-    // Response parsing
-    // -------------------------------------------------------------------------
-
-    private static async Task<string> ParseAnswerAsync(
-        HttpResponseMessage response,
-        CancellationToken cancellationToken)
+    private static async Task<string> ParseAnswerAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var parsed = await response.Content.ReadFromJsonAsync<AzureChatResponse>(cancellationToken)
             ?? throw new InvalidOperationException("Azure OpenAI chat response was empty.");
 
-        var content = parsed.Choices?.FirstOrDefault()?.Message?.Content;
+        var choice = parsed.Choices.FirstOrDefault();
+        var content = choice?.Message?.Content;
         if (string.IsNullOrWhiteSpace(content))
         {
-            throw new InvalidOperationException("Azure OpenAI chat response contained no message content.");
+            throw new InvalidOperationException("Azure OpenAI chat response did not include answer content.");
         }
 
-        return content.Trim();
+        return content;
     }
-
-    // -------------------------------------------------------------------------
-    // Retry helpers
-    // -------------------------------------------------------------------------
 
     private static TimeSpan GetRetryDelay(int attempt)
         => TimeSpan.FromMilliseconds(250 * attempt);
@@ -350,46 +341,36 @@ public sealed class AzureOpenAiChatService(
            || statusCode == (HttpStatusCode)429
            || (int)statusCode >= 500;
 
-    /// <summary>
-    /// Strips CR and LF characters from a log value to prevent log-forging attacks.
-    /// </summary>
-    private static string SanitizeLogValue(string value)
-        => value.Replace("\r", string.Empty, StringComparison.Ordinal)
-                .Replace("\n", string.Empty, StringComparison.Ordinal);
-
-    // -------------------------------------------------------------------------
-    // Private API DTOs
-    // -------------------------------------------------------------------------
+    private static string SanitizeLogValue(string? value)
+        => string.IsNullOrWhiteSpace(value) ? "<empty>" : value;
 
     private sealed class AzureChatRequest
     {
-        public required IReadOnlyList<AzureChatMessage> Messages { get; init; }
+        public required List<AzureChatMessage> Messages { get; init; }
 
-        [JsonPropertyName("max_completion_tokens")]
-        public int MaxTokens { get; init; } = 1024;
+        public int MaxTokens { get; init; }
 
-        public float Temperature { get; init; } = 0.2f;
+        public float Temperature { get; init; }
     }
 
     private sealed class AzureChatMessage
     {
+        [JsonPropertyName("role")]
         public required string Role { get; init; }
 
+        [JsonPropertyName("content")]
         public required string Content { get; init; }
     }
 
     private sealed class AzureChatResponse
     {
-        public List<AzureChatChoice>? Choices { get; init; }
+        [JsonPropertyName("choices")]
+        public List<AzureChatChoice> Choices { get; init; } = [];
     }
 
     private sealed class AzureChatChoice
     {
-        public AzureChatMessageResponse? Message { get; init; }
-    }
-
-    private sealed class AzureChatMessageResponse
-    {
-        public string? Content { get; init; }
+        [JsonPropertyName("message")]
+        public AzureChatMessage? Message { get; init; }
     }
 }

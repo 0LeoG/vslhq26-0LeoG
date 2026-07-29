@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
 
-namespace OnboardMe.Web.Services.RepoIngestion;
+namespace OnboardMe.Web.Models;
 
-internal sealed class GitHubTreeItem
+public sealed class GitHubTreeItem
 {
     [JsonPropertyName("path")]
     public required string Path { get; init; }

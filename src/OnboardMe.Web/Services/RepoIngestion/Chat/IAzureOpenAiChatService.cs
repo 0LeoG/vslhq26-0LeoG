@@ -6,8 +6,8 @@ namespace OnboardMe.Web.Services.RepoIngestion;
 public interface IAzureOpenAiChatService
 {
     /// <summary>
-    /// Rewrites a follow-up <paramref name="question"/> into a self-contained retrieval query
-    /// using the <paramref name="recentHistory"/> of the current conversation. Returns the
+    /// Rewrites a follow-up <paramref name="question" /> into a self-contained retrieval query
+    /// using the <paramref name="recentHistory" /> of the current conversation. Returns the
     /// original question unchanged when history is empty.
     /// </summary>
     /// <param name="question">The raw user question (may be a follow-up).</param>
@@ -20,7 +20,7 @@ public interface IAzureOpenAiChatService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Sends the <paramref name="question"/> and the pre-retrieved <paramref name="contextChunks"/>
+    /// Sends the <paramref name="question" /> and the pre-retrieved <paramref name="contextChunks" />
     /// to Azure OpenAI and returns a grounded answer with file-path citations.
     /// </summary>
     /// <param name="owner">GitHub repository owner.</param>
@@ -32,7 +32,7 @@ public interface IAzureOpenAiChatService
     /// Retrieval results, not prior assistant messages, remain the authoritative source of citations.
     /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A <see cref="ChatAnswer"/> containing the answer text and file citations.</returns>
+    /// <returns>A <see cref="ChatAnswer" /> containing the answer text and file citations.</returns>
     Task<ChatAnswer> AnswerAsync(
         string owner,
         string repository,

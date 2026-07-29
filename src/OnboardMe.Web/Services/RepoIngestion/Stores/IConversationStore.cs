@@ -2,8 +2,8 @@ namespace OnboardMe.Web.Services.RepoIngestion;
 
 /// <summary>
 /// Abstraction for persisting bounded conversation histories, isolated by session and repository.
-/// Implement <see cref="IConversationStore"/> with a database-backed store for production use;
-/// the MVP ships with <see cref="InMemoryConversationStore"/>.
+/// Implement <see cref="IConversationStore" /> with a database-backed store for production use;
+/// the MVP ships with <see cref="InMemoryConversationStore" />.
 /// </summary>
 public interface IConversationStore
 {
@@ -18,7 +18,7 @@ public interface IConversationStore
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Appends <paramref name="message"/> to the conversation, evicting the oldest message(s)
+    /// Appends <paramref name="message" /> to the conversation, evicting the oldest message(s)
     /// when the history bound is reached.
     /// </summary>
     Task AddMessageAsync(

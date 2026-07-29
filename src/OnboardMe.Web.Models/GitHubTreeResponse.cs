@@ -1,8 +1,8 @@
 using System.Text.Json.Serialization;
 
-namespace OnboardMe.Web.Services.RepoIngestion;
+namespace OnboardMe.Web.Models;
 
-internal sealed class GitHubTreeResponse
+public sealed class GitHubTreeResponse
 {
     [JsonPropertyName("tree")]
     public List<GitHubTreeItem> Tree { get; init; } = [];

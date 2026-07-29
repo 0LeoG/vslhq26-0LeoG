@@ -3,8 +3,8 @@ using System.Collections.Concurrent;
 namespace OnboardMe.Web.Services.RepoIngestion;
 
 /// <summary>
-/// In-memory implementation of <see cref="IConversationStore"/>.
-/// Conversations are bounded to <see cref="MaxMessages"/> messages per session/repository key.
+/// In-memory implementation of <see cref="IConversationStore" />.
+/// Conversations are bounded to <see cref="MaxMessages" /> messages per session/repository key.
 /// State is lost on application restart; replace with a database-backed implementation for production.
 /// </summary>
 public sealed class InMemoryConversationStore : IConversationStore
