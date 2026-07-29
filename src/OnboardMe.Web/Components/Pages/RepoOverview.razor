@@ -1,7 +1,121 @@
 @page "/repo-overview"
+@rendermode InteractiveServer
+@inject IRepositoryIndexingStatusStore IndexingStatusStore
 
 <PageTitle>Repo Overview</PageTitle>
 
 <h1>Repo Overview</h1>
 
-<p>Repository map and summaries will live here.</p>
+@if (!hasLoadedState)
+{
+    <p class="text-muted">Loading...</p>
+}
+else if (indexedRepos.Count == 0)
+{
+    <div class="empty-state">
+        <p class="lead">No repository has been indexed yet.</p>
+        <p>Go to <a href="/repo-setup">Repo Setup</a> to index a GitHub repository first.</p>
+    </div>
+}
+else if (selectedOverview is not null)
+{
+    <div class="mb-3">
+        <label class="form-label fw-semibold" for="repo-overview-select">Repository</label>
+        <select id="repo-overview-select" class="form-select" @onchange="OnRepoSelectionChanged">
+            @foreach (var repo in indexedRepos)
+            {
+                <option value="@($"{repo.Owner}/{repo.Repository}")" selected="@(repo.Owner == selectedOwner && repo.Repository == selectedRepository)">
+                    @repo.Owner/@repo.Repository
+                </option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <span class="badge text-bg-secondary me-2">Indexing: @selectedOverview.State</span>
+        <span class="text-muted">Last updated: @selectedOverview.LastUpdatedUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss zzz")</span>
+    </div>
+
+    <p>@selectedOverview.Summary</p>
+
+    <h2 class="h4 mt-4">Top-level structure</h2>
+    <ul class="list-group mb-4">
+        @foreach (var item in selectedOverview.TopLevelItems)
+        {
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span><strong>@item.Name</strong> <span class="text-muted">(@item.Kind)</span></span>
+                <span class="badge text-bg-light">@item.FileCount file(s)</span>
+            </li>
+        }
+    </ul>
+
+    <h2 class="h4">Notable files</h2>
+    @if (selectedOverview.NotableFiles.Count == 0)
+    {
+        <p class="text-muted">No notable files were detected.</p>
+    }
+    else
+    {
+        <ul class="list-group">
+            @foreach (var notable in selectedOverview.NotableFiles)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <code>@notable.Path</code>
+                    <span class="badge text-bg-info">@notable.Category</span>
+                </li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    private bool hasLoadedState;
+    private string selectedOwner = string.Empty;
+    private string selectedRepository = string.Empty;
+    private IReadOnlyList<RepositoryIndexingStatus> indexedRepos = [];
+    private RepositoryOverviewSnapshot? selectedOverview;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var allStatuses = await IndexingStatusStore.ListAsync();
+        indexedRepos = allStatuses
+            .Where(r => r.State is RepositoryIndexingState.Completed or RepositoryIndexingState.CompletedWithErrors)
+            .OrderBy(r => $"{r.Owner}/{r.Repository}", StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (indexedRepos.Count > 0)
+        {
+            var latest = indexedRepos
+                .OrderByDescending(status => status.CompletedAtUtc ?? status.StartedAtUtc)
+                .First();
+            selectedOwner = latest.Owner;
+            selectedRepository = latest.Repository;
+            selectedOverview = RepositoryOverviewGenerator.Create(latest);
+        }
+
+        hasLoadedState = true;
+    }
+
+    private void OnRepoSelectionChanged(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString() ?? string.Empty;
+        var slash = value.IndexOf('/');
+        if (slash <= 0)
+        {
+            return;
+        }
+
+        selectedOwner = value[..slash];
+        selectedRepository = value[(slash + 1)..];
+
+        var status = indexedRepos.FirstOrDefault(repo =>
+            string.Equals(repo.Owner, selectedOwner, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(repo.Repository, selectedRepository, StringComparison.OrdinalIgnoreCase));
+        if (status is null)
+        {
+            return;
+        }
+
+        selectedOverview = RepositoryOverviewGenerator.Create(status);
+    }
+}
