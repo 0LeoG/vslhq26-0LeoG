@@ -300,11 +300,6 @@ public class RepositoryIngestionServiceTests
                         {
                             index = 0,
                             embedding = new[] { 0.11f, 0.22f, 0.33f }
-                        },
-                        new
-                        {
-                            index = 1,
-                            embedding = new[] { 0.44f, 0.55f, 0.66f }
                         }
                     }
                 });

@@ -1,5 +1,6 @@
 @page "/chat"
 @rendermode InteractiveServer
+@implements IDisposable
 @inject IRepositoryIndexingStatusStore IndexingStatusStore
 @inject IAzureOpenAiEmbeddingService EmbeddingService
 @inject IRepositoryEmbeddingStore EmbeddingStore
@@ -29,10 +30,67 @@ else
             @foreach (var repo in indexedRepos)
             {
                 <option value="@($"{repo.Owner}/{repo.Repository}")" selected="@(selectedOwner == repo.Owner && selectedRepository == repo.Repository)">
-                    @repo.Owner/@repo.Repository
+                    @repo.Owner/@repo.Repository@(repo.State == RepositoryIndexingState.Running ? " (indexing...)" : string.Empty)
                 </option>
             }
         </select>
+    </div>
+
+    @if (selectedRepositoryStatus?.State == RepositoryIndexingState.Running)
+    {
+        <div class="indexing-banner" role="status" aria-live="polite">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <strong>Repository is still indexing in the background.</strong>
+                <span class="text-muted small">Answers may improve as more files are processed.</span>
+            </div>
+            <div class="progress" role="progressbar" aria-label="Repository indexing progress" aria-valuenow="@SelectedRepositoryProgressPercent" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: @($"{SelectedRepositoryProgressPercent}%")">
+                    @SelectedRepositoryProgressPercent%
+                </div>
+            </div>
+            <div class="form-text mt-2 mb-0">
+                Processed @selectedRepositoryStatus.ProcessedFileCount of @selectedRepositoryStatus.TotalFileCount files.
+                Embedded @selectedRepositoryStatus.EmbeddedChunkCount chunks.
+            </div>
+        </div>
+    }
+
+    <div class="start-here-panel">
+        <h2 class="h5 mb-2">Where should I start?</h2>
+        <p class="text-muted mb-2">Describe what you need to change, then get suggested files to read first.</p>
+
+        <EditForm Model="startHereInputModel" OnSubmit="SuggestStartingFiles">
+            <div class="input-group">
+                <InputText class="form-control"
+                           @bind-Value="startHereInputModel.TaskPrompt"
+                           placeholder="Example: I need to change auth"
+                           disabled="@isLoading"
+                           aria-label="Task prompt" />
+                <button type="submit" class="btn btn-outline-primary" disabled="@(isLoading || string.IsNullOrWhiteSpace(startHereInputModel.TaskPrompt))">
+                    Suggest files
+                </button>
+            </div>
+        </EditForm>
+
+        @if (!string.IsNullOrWhiteSpace(startHereMessage))
+        {
+            <p class="text-muted mt-2 mb-0">@startHereMessage</p>
+        }
+
+        @if (startHereSuggestions.Count > 0)
+        {
+            <ul class="start-here-list mt-3 mb-0">
+                @foreach (var suggestion in startHereSuggestions)
+                {
+                    <li>
+                        <a href="https://github.com/@selectedOwner/@selectedRepository/blob/HEAD/@suggestion.Path"
+                           target="_blank"
+                           rel="noopener noreferrer">@suggestion.Path</a>
+                        <div class="text-muted">@suggestion.Reason</div>
+                    </li>
+                }
+            </ul>
+        }
     </div>
 
     @* Message list *@
@@ -130,9 +188,17 @@ else
     private string selectedOwner = string.Empty;
     private string selectedRepository = string.Empty;
     private IReadOnlyList<RepositoryIndexingStatus> indexedRepos = [];
+    private RepositoryIndexingStatus? selectedRepositoryStatus;
     private readonly List<ChatMessageModel> messages = [];
+    private readonly StartHereInputModel startHereInputModel = new();
+    private IReadOnlyList<StartHereSuggestion> startHereSuggestions = [];
+    private string? startHereMessage;
+    private CancellationTokenSource? statusPollingCts;
 
     private readonly ChatInputModel inputModel = new();
+    private int SelectedRepositoryProgressPercent => selectedRepositoryStatus?.TotalFileCount > 0
+        ? Math.Clamp((int)((double)selectedRepositoryStatus.ProcessedFileCount / selectedRepositoryStatus.TotalFileCount * 100), 0, 100)
+        : 0;
 
     // -------------------------------------------------------------------------
     // Lifecycle
@@ -140,17 +206,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var all = await IndexingStatusStore.ListAsync();
-        indexedRepos = all
-            .Where(r => r.State is RepositoryIndexingState.Completed or RepositoryIndexingState.CompletedWithErrors)
-            .OrderBy(r => $"{r.Owner}/{r.Repository}", StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (indexedRepos.Count > 0)
-        {
-            selectedOwner = indexedRepos[0].Owner;
-            selectedRepository = indexedRepos[0].Repository;
-        }
+        await RefreshRepositoryStatusesAsync();
+        StartStatusPolling();
 
         hasLoadedState = true;
     }
@@ -169,8 +226,14 @@ else
             selectedRepository = value[(slash + 1)..];
         }
 
+        selectedRepositoryStatus = indexedRepos.FirstOrDefault(repo =>
+            string.Equals(repo.Owner, selectedOwner, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(repo.Repository, selectedRepository, StringComparison.OrdinalIgnoreCase));
+
         // Clear conversation when the user switches repos.
         messages.Clear();
+        startHereSuggestions = [];
+        startHereMessage = null;
     }
 
     private async Task SendMessage()
@@ -191,6 +254,14 @@ else
 
         try
         {
+            var currentEmbeddings = await EmbeddingStore.GetRepositoryEmbeddingsAsync(selectedOwner, selectedRepository);
+            if (currentEmbeddings.Count == 0)
+            {
+                placeholder.IsLoading = false;
+                placeholder.ErrorMessage = "No embeddings are available yet for this repository. Wait for indexing progress and try again.";
+                return;
+            }
+
             // Step 1: embed the question.
             var queryChunk = new RepositoryContentChunk
             {
@@ -233,6 +304,93 @@ else
         }
     }
 
+    private void StartStatusPolling()
+    {
+        statusPollingCts?.Cancel();
+        statusPollingCts?.Dispose();
+        statusPollingCts = new CancellationTokenSource();
+        var cancellationToken = statusPollingCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    await RefreshRepositoryStatusesAsync();
+                    await InvokeAsync(StateHasChanged);
+                    await Task.Delay(1000, cancellationToken);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Normal cancellation on page disposal.
+            }
+        }, cancellationToken);
+    }
+
+    private async Task RefreshRepositoryStatusesAsync()
+    {
+        var all = await IndexingStatusStore.ListAsync();
+        indexedRepos = all
+            .Where(r => r.State is not RepositoryIndexingState.Failed)
+            .OrderBy(r => $"{r.Owner}/{r.Repository}", StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (indexedRepos.Count == 0)
+        {
+            selectedOwner = string.Empty;
+            selectedRepository = string.Empty;
+            selectedRepositoryStatus = null;
+            return;
+        }
+
+        var selectedStillExists = indexedRepos.Any(repo =>
+            string.Equals(repo.Owner, selectedOwner, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(repo.Repository, selectedRepository, StringComparison.OrdinalIgnoreCase));
+
+        if (!selectedStillExists)
+        {
+            selectedOwner = indexedRepos[0].Owner;
+            selectedRepository = indexedRepos[0].Repository;
+        }
+
+        selectedRepositoryStatus = indexedRepos.FirstOrDefault(repo =>
+            string.Equals(repo.Owner, selectedOwner, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(repo.Repository, selectedRepository, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public void Dispose()
+    {
+        statusPollingCts?.Cancel();
+        statusPollingCts?.Dispose();
+    }
+
+    private void SuggestStartingFiles()
+    {
+        var prompt = startHereInputModel.TaskPrompt?.Trim();
+        if (string.IsNullOrWhiteSpace(prompt))
+        {
+            return;
+        }
+
+        var selectedRepo = indexedRepos.FirstOrDefault(repo =>
+            string.Equals(repo.Owner, selectedOwner, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(repo.Repository, selectedRepository, StringComparison.OrdinalIgnoreCase));
+
+        if (selectedRepo is null)
+        {
+            startHereSuggestions = [];
+            startHereMessage = "Select a repository first.";
+            return;
+        }
+
+        startHereSuggestions = StartHereGuideGenerator.CreateSuggestions(prompt, selectedRepo.Files);
+        startHereMessage = startHereSuggestions.Count == 0
+            ? "No starter files found yet. Try a more specific task prompt."
+            : "Simple keyword-based suggestions for now; this can be improved with richer repo mapping later.";
+    }
+
     // -------------------------------------------------------------------------
     // Inner models
     // -------------------------------------------------------------------------
@@ -252,5 +410,10 @@ else
     {
         public string? Question { get; set; }
     }
-}
 
+    /// <summary>Bound model for the guided start prompt.</summary>
+    private sealed class StartHereInputModel
+    {
+        public string? TaskPrompt { get; set; }
+    }
+}
