@@ -11,6 +11,8 @@ public sealed class RepositoryIngestionService(
     IRepositoryIndexingStatusStore statusStore,
     ILogger<RepositoryIngestionService> logger) : IRepositoryIngestionService
 {
+    public const string GitHubApiClientName = "GitHubApi";
+
     // First-pass ingestion keeps each file under 512 KB so fetches stay reliable.
     private const int MaxFileSizeBytes = 512 * 1024;
 
@@ -188,5 +190,4 @@ public sealed class RepositoryIngestionService(
         public long? Size { get; init; }
     }
 
-    public const string GitHubApiClientName = "GitHubApi";
 }
