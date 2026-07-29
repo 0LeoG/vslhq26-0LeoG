@@ -91,9 +91,11 @@ public sealed class RepositoryIngestionService(
             }
 
             status.CompletedAtUtc = DateTimeOffset.UtcNow;
-            status.State = status.FailedCount > 0
-                ? RepositoryIndexingState.CompletedWithErrors
-                : RepositoryIndexingState.Completed;
+            status.State = RepositoryIndexingState.Completed;
+            if (status.FailedCount > 0)
+            {
+                status.State = RepositoryIndexingState.CompletedWithErrors;
+            }
 
             await statusStore.SaveAsync(status, cancellationToken);
             return status;
