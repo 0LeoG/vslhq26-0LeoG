@@ -146,6 +146,70 @@ app.MapPost("/repos/{owner}/{repository}/embeddings/rerun", async (
     }
 });
 
+// POST /repos/{owner}/{repository}/search
+// Body: { "query": "user question", "topK": 5 }
+// Converts the question to an embedding and returns the most relevant chunks for that repo.
+app.MapPost("/repos/{owner}/{repository}/search", async (
+    string owner,
+    string repository,
+    SearchRequest body,
+    IAzureOpenAiEmbeddingService embeddingService,
+    IRepositoryEmbeddingStore embeddingStore,
+    CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(body.Query))
+    {
+        return Results.BadRequest(new { message = "Query must not be empty." });
+    }
+
+    var topK = body.TopK is > 0 ? body.TopK.Value : 5;
+
+    // Embed the query as a single-chunk synthetic record so we can reuse the embedding service.
+    var queryChunk = new OnboardMe.Web.Services.RepoIngestion.RepositoryContentChunk
+    {
+        ChunkId = "query:0",
+        SourcePath = "__query__",
+        SourceSha = string.Empty,
+        ChunkIndex = 0,
+        Strategy = "query",
+        StartLine = 0,
+        EndLine = 0,
+        Content = body.Query
+    };
+
+    IReadOnlyList<OnboardMe.Web.Services.RepoIngestion.RepositoryChunkEmbeddingRecord> queryEmbeddings;
+    try
+    {
+        queryEmbeddings = await embeddingService.GenerateEmbeddingsAsync(owner, repository, [queryChunk], cancellationToken);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem(
+            title: "Embedding generation failed.",
+            detail: ex.Message,
+            statusCode: StatusCodes.Status502BadGateway);
+    }
+
+    var queryEmbedding = queryEmbeddings[0].Embedding;
+    var results = await embeddingStore.SearchByEmbeddingAsync(owner, repository, queryEmbedding, topK, cancellationToken);
+
+    return Results.Ok(new
+    {
+        owner,
+        repository,
+        query = body.Query,
+        results = results.Select(r => new
+        {
+            chunkId = r.Chunk.ChunkId,
+            sourcePath = r.Chunk.SourcePath,
+            startLine = r.Chunk.StartLine,
+            endLine = r.Chunk.EndLine,
+            score = r.Score,
+            content = r.Chunk.Content
+        })
+    });
+});
+
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
@@ -180,4 +244,14 @@ static string NormalizeReturnUrl(string? returnUrl)
     }
 
     return returnUrl;
+}
+
+/// <summary>Request body for the semantic search endpoint.</summary>
+internal sealed class SearchRequest
+{
+    /// <summary>The natural-language question to search for.</summary>
+    public string Query { get; init; } = string.Empty;
+
+    /// <summary>Maximum number of results to return. Defaults to 5 when omitted or ≤ 0.</summary>
+    public int? TopK { get; init; }
 }
