@@ -348,6 +348,7 @@ public sealed class AzureOpenAiChatService(
     {
         public required List<AzureChatMessage> Messages { get; init; }
 
+        [JsonPropertyName("max_completion_tokens")]
         public int MaxTokens { get; init; }
 
         public float Temperature { get; init; }

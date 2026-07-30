@@ -138,7 +138,57 @@
 }
 
 .answer-text {
-    white-space: pre-wrap;
+    margin-top: 0.5rem;
+}
+
+.answer-text :first-child {
+    margin-top: 0;
+}
+
+.answer-text :last-child {
+    margin-bottom: 0;
+}
+
+.answer-text p,
+.answer-text ul,
+.answer-text ol,
+.answer-text pre,
+.answer-text blockquote,
+.answer-text table {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.answer-text code {
+    font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.9em;
+    background-color: var(--f-bg-3);
+    border: 1px solid var(--f-stroke-1);
+    border-radius: var(--radius-sm);
+    padding: 0.1rem 0.35rem;
+}
+
+.answer-text pre {
+    background-color: var(--f-bg-3);
+    border: 1px solid var(--f-stroke-1);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    overflow-x: auto;
+}
+
+.answer-text pre code {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    font-size: 0.85rem;
+    white-space: pre;
+}
+
+.answer-text blockquote {
+    border-left: 3px solid var(--f-stroke-2);
+    padding-left: 0.75rem;
+    color: var(--f-fg-3);
 }
 
 /* Citations */

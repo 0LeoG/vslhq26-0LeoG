@@ -1,6 +1,7 @@
 @page "/chat"
 @rendermode InteractiveServer
 @implements IDisposable
+@using Markdig
 @inject IRepositoryIndexingStatusStore IndexingStatusStore
 @inject IAzureOpenAiEmbeddingService EmbeddingService
 @inject IRepositoryEmbeddingStore EmbeddingStore
@@ -153,14 +154,14 @@
                             {
                                 <div class="message-answer">
                                     <span class="badge bg-warning me-2">Clarification needed</span>
-                                    <span class="answer-text">@msg.Answer</span>
+                                    <div class="answer-text">@RenderMarkdown(msg.Answer)</div>
                                 </div>
                             }
                             else
                             {
                                 <div class="message-answer">
                                     <span class="badge bg-secondary me-2">Assistant</span>
-                                    <span class="answer-text">@msg.Answer</span>
+                                    <div class="answer-text">@RenderMarkdown(msg.Answer)</div>
                                 </div>
 
                                 @if (msg.Citations.Count > 0)
@@ -211,6 +212,11 @@
 </div>
 
 @code {
+    private static readonly MarkdownPipeline ChatMarkdownPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .DisableHtml()
+        .Build();
+
     // -------------------------------------------------------------------------
     // State
     // -------------------------------------------------------------------------
@@ -234,6 +240,17 @@
     private int SelectedRepositoryProgressPercent => selectedRepositoryStatus?.TotalFileCount > 0
         ? Math.Clamp((int)((double)selectedRepositoryStatus.ProcessedFileCount / selectedRepositoryStatus.TotalFileCount * 100), 0, 100)
         : 0;
+
+    private static MarkupString RenderMarkdown(string? content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            return (MarkupString)string.Empty;
+        }
+
+        var html = Markdown.ToHtml(content, ChatMarkdownPipeline);
+        return (MarkupString)html;
+    }
 
     // -------------------------------------------------------------------------
     // Lifecycle
