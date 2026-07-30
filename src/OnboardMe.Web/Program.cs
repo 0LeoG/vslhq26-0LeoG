@@ -37,6 +37,7 @@ builder.Services.AddSingleton<IRepositoryEmbeddingStore, InMemoryRepositoryEmbed
 builder.Services.AddSingleton<IConversationStore, InMemoryConversationStore>();
 builder.Services.AddSingleton<IAzureOpenAiEmbeddingService, AzureOpenAiEmbeddingService>();
 builder.Services.AddSingleton<IAzureOpenAiChatService, AzureOpenAiChatService>();
+builder.Services.AddSingleton<IRepositoryOverviewAiService, AzureOpenAiRepositoryOverviewService>();
 builder.Services.AddSingleton<IRepositoryIngestionService, RepositoryIngestionService>();
 
 var githubClientId = builder.Configuration[GitHubClientIdConfigKey];
