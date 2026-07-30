@@ -4,14 +4,14 @@ onboard-me is a demo-ready onboarding assistant for unfamiliar codebases. The ap
 
 ## Team
 
-- **Team name (or "Solo"):** Solo
+- **Team name:** Solo
 - **Members:**
   - LeoG (@0LeoG)
 
 ## Category
 
-- **Primary:** Copilot integration
-- **Secondary (optional):** Best AI Agent or Workflow Automation
+- **Primary:** category-azure-openai
+- **Secondary (optional):** category-dotnet-business-app
 
 ## What it does
 
@@ -21,7 +21,6 @@ The current app includes a working end-to-end flow for repository onboarding:
 - Ingest repository content in the background while tracking progress
 - Build a repository overview with tracked files, language breakdowns, and notable files
 - Ask questions in a chat experience that uses retrieved repository context and returns citations
-- Generate lightweight “start here” suggestions for a task prompt to help developers get oriented quickly
 
 The experience is designed to reduce the time it takes to answer questions like “where should I start?”, “which files matter for this feature?”, and “how does this system fit together?”
 
@@ -31,7 +30,7 @@ The project is currently implemented as an ASP.NET Core Blazor web app with Azur
 
 ### Key capabilities
 
-- **GitHub OAuth sign-in** for authenticated repo setup
+- **GitHub OAuth sign-in** for authenticated repo setup (Not yet implemented)
 - **Repository ingestion pipeline** that fetches repository content, chunks it, and prepares embeddings
 - **Background indexing status** with progress updates and per-repository state
 - **Repository overview page** for architecture summaries and structural inspection
@@ -156,16 +155,14 @@ dotnet test onboard-me.sln
 
 ## Demo
 
-- **Video file in this repo (preferred):** `./demo/demo.mp4`
-- **Video link (YouTube, Loom, etc.) if not committed to repo:**
-- **Deployed URL (if any):**
+- **Video file in this repo:** `./demo/demo.mp4`
 
 ## Current limitations
 
 - Repository support is currently focused on root GitHub repository URLs
 - Private repository access is not yet enabled in this pass
 - The current implementation uses in-memory storage, which is suitable for demos but not production-scale persistence
-- Retrieval quality will continue to improve as chunking, prompts, and embeddings evolve
+- Retrieval could continue to evolve with persisted effort. 
 
 ## License
 
