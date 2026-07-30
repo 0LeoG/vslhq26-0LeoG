@@ -1,114 +1,257 @@
-.empty-state {
-    color: #6c757d;
-    padding: 2rem 0;
+/* Full-height chat page — SPA shell fills the app-content area */
+.chat-page {
+    display: flex;
+    flex-direction: column;
+    height: 100%;          /* fills app-content (100vh) */
+    background-color: var(--f-bg-1);
 }
 
+.chat-header {
+    flex-shrink: 0;
+    padding: 1rem 1.5rem 0.75rem;
+    border-bottom: 1px solid var(--f-stroke-1);
+    background-color: var(--f-bg-1);
+}
+
+.chat-header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    color: var(--f-fg-1);
+}
+
+.chat-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 1rem 1.5rem 0;
+    gap: 0.75rem;
+}
+
+/* Repository selector */
 .repo-selector {
-    max-width: 400px;
+    max-width: 380px;
+    flex-shrink: 0;
 }
 
-.start-here-panel {
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    background: #f8f9fa;
-}
-
+/* Indexing status banner */
 .indexing-banner {
-    border: 1px solid #cfe2ff;
-    background: #f3f8ff;
-    border-radius: 0.5rem;
-    padding: 0.9rem 1rem;
-    margin-bottom: 1rem;
+    border: 1px solid var(--f-brand-tint-2);
+    background: var(--f-brand-tint);
+    border-radius: var(--radius-lg);
+    padding: 0.75rem 1rem;
+    flex-shrink: 0;
+}
+
+/* Start-here guided panel */
+.start-here-panel {
+    border: 1px solid var(--f-stroke-1);
+    border-radius: var(--radius-lg);
+    padding: 0.875rem 1rem;
+    background: var(--f-bg-3);
+    flex-shrink: 0;
+    box-shadow: var(--shadow-2);
+}
+
+.start-here-panel h2 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    color: var(--f-fg-1);
 }
 
 .start-here-list {
     padding-left: 1rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0;
 }
 
     .start-here-list li {
-        margin-bottom: 0.6rem;
+        margin-bottom: 0.5rem;
+        font-size: 13px;
     }
 
-.message-list {
+/* Scrollable message list */
+.message-list-wrapper {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 1.25rem;
-    margin-bottom: 1.5rem;
-    max-height: 60vh;
-    overflow-y: auto;
-    padding-right: 0.25rem;
+    gap: 0.875rem;
+    padding-bottom: 0.5rem;
+    /* Thin scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: var(--f-stroke-2) transparent;
 }
 
+    .message-list-wrapper::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .message-list-wrapper::-webkit-scrollbar-thumb {
+        background-color: var(--f-stroke-2);
+        border-radius: 3px;
+    }
+
+    .message-list-wrapper::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+.message-list-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+    padding-top: 0.25rem;
+}
+
+/* Individual message items */
 .message-item {
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
+    border: 1px solid var(--f-stroke-1);
+    border-radius: var(--radius-lg);
     padding: 0.875rem 1rem;
-    background: #fff;
+    background: var(--f-bg-1);
+    box-shadow: var(--shadow-2);
 }
 
 .message-question {
     font-weight: 600;
     margin-bottom: 0.5rem;
+    color: var(--f-fg-1);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .message-answer {
-    color: #343a40;
+    color: var(--f-fg-2);
     line-height: 1.6;
+    font-size: 14px;
 }
 
 .loading-answer {
-    color: #6c757d;
+    color: var(--f-fg-3);
 }
 
 .answer-text {
-    white-space: pre-wrap;
+    margin-top: 0.5rem;
 }
 
+.answer-text :first-child {
+    margin-top: 0;
+}
+
+.answer-text :last-child {
+    margin-bottom: 0;
+}
+
+.answer-text p,
+.answer-text ul,
+.answer-text ol,
+.answer-text pre,
+.answer-text blockquote,
+.answer-text table {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.answer-text code {
+    font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.9em;
+    background-color: var(--f-bg-3);
+    border: 1px solid var(--f-stroke-1);
+    border-radius: var(--radius-sm);
+    padding: 0.1rem 0.35rem;
+}
+
+.answer-text pre {
+    background-color: var(--f-bg-3);
+    border: 1px solid var(--f-stroke-1);
+    border-radius: var(--radius-md);
+    padding: 0.75rem;
+    overflow-x: auto;
+}
+
+.answer-text pre code {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    font-size: 0.85rem;
+    white-space: pre;
+}
+
+.answer-text blockquote {
+    border-left: 3px solid var(--f-stroke-2);
+    padding-left: 0.75rem;
+    color: var(--f-fg-3);
+}
+
+/* Citations */
 .citations {
     margin-top: 0.75rem;
-    padding-top: 0.75rem;
-    border-top: 1px solid #e9ecef;
+    padding-top: 0.625rem;
+    border-top: 1px solid var(--f-stroke-1);
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.375rem;
 }
 
 .citations-label {
-    font-size: 0.8rem;
-    color: #6c757d;
+    font-size: 11px;
+    color: var(--f-fg-3);
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-right: 0.25rem;
+    letter-spacing: 0.05em;
+    margin-right: 0.2rem;
 }
 
 .citation-link {
-    font-size: 0.8rem;
-    background: #f0f4ff;
-    border: 1px solid #cdd9f5;
-    border-radius: 0.25rem;
-    padding: 0.125rem 0.4rem;
+    font-size: 12px;
+    background: var(--f-brand-tint);
+    border: 1px solid var(--f-brand-tint-2);
+    border-radius: var(--radius-sm);
+    padding: 0.125rem 0.375rem;
     text-decoration: none;
-    color: #0d6efd;
+    color: var(--f-brand-primary);
     white-space: nowrap;
+    transition: background-color 0.1s ease;
 }
 
     .citation-link:hover {
-        background: #dde8ff;
+        background: var(--f-brand-tint-2);
         text-decoration: underline;
+        color: var(--f-brand-hover);
     }
 
 .citation-lines {
-    color: #6c757d;
+    color: var(--f-fg-3);
 }
 
+/* Empty state */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1.5rem;
+    color: var(--f-fg-3);
+    text-align: center;
+}
+
+.empty-state p {
+    margin-bottom: 0.5rem;
+}
+
+/* Sticky chat input area */
 .chat-input-area {
-    position: sticky;
-    bottom: 0;
-    background: #fff;
-    padding: 0.75rem 0 0.25rem;
-    border-top: 1px solid #dee2e6;
+    flex-shrink: 0;
+    padding: 0.875rem 1.5rem;
+    border-top: 1px solid var(--f-stroke-1);
+    background: var(--f-bg-1);
 }

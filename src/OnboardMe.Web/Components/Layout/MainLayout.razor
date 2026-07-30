@@ -1,18 +1,12 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
+<div class="app-shell">
+    <aside class="app-sidebar">
         <NavMenu />
-    </div>
+    </aside>
 
-    <main>
-        <div class="top-row px-4">
-            <span class="text-muted">Codebase onboarding workspace</span>
-        </div>
-
-        <article class="content px-4">
-            @Body
-        </article>
+    <main class="app-content">
+        @Body
     </main>
 </div>
 

@@ -1,4 +1,4 @@
-namespace OnboardMe.Web.Services.RepoIngestion;
+namespace OnboardMe.Web.Models;
 
 public sealed class RepositoryIndexingStatus
 {

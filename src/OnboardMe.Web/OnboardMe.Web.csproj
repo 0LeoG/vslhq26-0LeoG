@@ -8,4 +8,12 @@
     <UserSecretsId>OnboardMe.Web-LocalSecrets</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\OnboardMe.Web.Models\OnboardMe.Web.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="0.37.0" />
+  </ItemGroup>
+
 </Project>
