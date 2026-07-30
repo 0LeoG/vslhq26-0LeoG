@@ -65,44 +65,6 @@
                 </div>
             }
 
-            <div class="start-here-panel">
-                <h2 class="h5 mb-1">Where should I start?</h2>
-                <p class="text-muted mb-2" style="font-size:13px;">Describe what you need to change, then get suggested files to read first.</p>
-
-                <EditForm Model="startHereInputModel" OnSubmit="SuggestStartingFiles">
-                    <div class="input-group">
-                        <InputText class="form-control form-control-sm"
-                                   @bind-Value="startHereInputModel.TaskPrompt"
-                                   placeholder="Example: I need to change auth"
-                                   disabled="@isLoading"
-                                   aria-label="Task prompt" />
-                        <button type="submit" class="btn btn-outline-primary btn-sm" disabled="@(isLoading || string.IsNullOrWhiteSpace(startHereInputModel.TaskPrompt))">
-                            Suggest files
-                        </button>
-                    </div>
-                </EditForm>
-
-                @if (!string.IsNullOrWhiteSpace(startHereMessage))
-                {
-                    <p class="text-muted mt-2 mb-0" style="font-size:12px;">@startHereMessage</p>
-                }
-
-                @if (startHereSuggestions.Count > 0)
-                {
-                    <ul class="start-here-list mt-2 mb-0">
-                        @foreach (var suggestion in startHereSuggestions)
-                        {
-                            <li>
-                                <a href="https://github.com/@selectedOwner/@selectedRepository/blob/HEAD/@suggestion.Path"
-                                   target="_blank"
-                                   rel="noopener noreferrer">@suggestion.Path</a>
-                                <div class="text-muted" style="font-size:12px;">@suggestion.Reason</div>
-                            </li>
-                        }
-                    </ul>
-                }
-            </div>
-
             <div class="message-list-controls">
                 <span class="text-muted small">
                     @if (messages.Count > 0)

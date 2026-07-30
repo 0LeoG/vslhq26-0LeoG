@@ -10,7 +10,13 @@
 
     @if (!hasLoadedState)
     {
-        <p class="text-muted">Loading…</p>
+        <div class="border rounded-3 bg-white p-4 my-3 shadow-sm d-flex align-items-center gap-3" aria-live="polite" aria-busy="true">
+            <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+            <div>
+                <div class="fw-semibold">Loading repository overview</div>
+                <div class="text-muted">Fetching repository status and preparing the overview.</div>
+            </div>
+        </div>
     }
     else if (indexedRepos.Count == 0)
     {
@@ -217,6 +223,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await Task.Yield();
+
         var allStatuses = await IndexingStatusStore.ListAsync();
         indexedRepos = allStatuses
             .Where(r => r.State is RepositoryIndexingState.Completed or RepositoryIndexingState.CompletedWithErrors)
