@@ -35,12 +35,14 @@ public static class RepositoryOverviewGenerator
             .ToList();
 
         var topLevelItems = files
+            .Select(file => file.Path.Replace('\\', '/'))
+            .Where(path => path.Length > 0)
             .GroupBy(
-                file => file.Path.Split('/', StringSplitOptions.RemoveEmptyEntries)[0],
+                path => path.Split('/', StringSplitOptions.RemoveEmptyEntries)[0],
                 StringComparer.OrdinalIgnoreCase)
             .Select(group =>
             {
-                var hasNestedPath = group.Any(file => file.Path.Contains('/'));
+                var hasNestedPath = group.Any(path => path.Contains('/'));
                 return new RepositoryOverviewTopLevelItem
                 {
                     Name = group.Key,
@@ -67,11 +69,46 @@ public static class RepositoryOverviewGenerator
             .Take(20)
             .ToList();
 
+        var languages = files
+            .Where(file => !string.IsNullOrWhiteSpace(file.Language))
+            .GroupBy(file => file.Language.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group => new RepositoryOverviewLanguageBreakdownItem
+            {
+                Language = group.Key,
+                FileCount = group.Count()
+            })
+            .OrderByDescending(item => item.FileCount)
+            .ThenBy(item => item.Language, StringComparer.OrdinalIgnoreCase)
+            .Take(10)
+            .ToList();
+
+        var skipReasons = files
+            .Where(file => file.Status == RepositoryFileIndexStatus.Skipped)
+            .GroupBy(file => string.IsNullOrWhiteSpace(file.SkipReason) ? "unspecified" : file.SkipReason!, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new RepositoryOverviewSkipReasonBreakdownItem
+            {
+                SkipReason = group.Key,
+                FileCount = group.Count()
+            })
+            .OrderByDescending(item => item.FileCount)
+            .ThenBy(item => item.SkipReason, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         var topLevelFolderCount = topLevelItems.Count(item => item.Kind == "Directory");
         var topLevelFileCount = topLevelItems.Count(item => item.Kind == "File");
+        var expectedFileCount = status.TotalFileCount > 0 ? status.TotalFileCount : files.Count;
+        var processingCoveragePercent = expectedFileCount == 0
+            ? 0
+            : Math.Round(status.ProcessedFileCount * 100d / expectedFileCount, 1);
+
+        var isPartial = status.State is not (RepositoryIndexingState.Completed or RepositoryIndexingState.CompletedWithErrors)
+                        || status.FailedCount > 0
+                        || processingCoveragePercent < 100;
+
         var summary = $"{status.Owner}/{status.Repository} has {files.Count} tracked files " +
                       $"across {topLevelFolderCount} top-level folders and {topLevelFileCount} top-level files. " +
-                      $"{status.IndexedCount} indexed, {status.SkippedCount} skipped, {status.FailedCount} failed.";
+                      $"{status.IndexedCount} indexed, {status.SkippedCount} skipped, {status.FailedCount} failed. " +
+                      $"{processingCoveragePercent:0.0}% of discovered files were processed.";
 
         return new RepositoryOverviewSnapshot
         {
@@ -80,8 +117,20 @@ public static class RepositoryOverviewGenerator
             State = status.State,
             LastUpdatedUtc = status.CompletedAtUtc ?? status.StartedAtUtc,
             Summary = summary,
+            TrackedFileCount = files.Count,
+            TopLevelDirectoryCount = topLevelFolderCount,
+            TopLevelFileCount = topLevelFileCount,
+            IndexedFileCount = status.IndexedCount,
+            SkippedFileCount = status.SkippedCount,
+            FailedFileCount = status.FailedCount,
+            EmbeddedChunkCount = status.EmbeddedChunkCount,
+            ProcessedChunkCount = status.ProcessedChunkCount,
+            ProcessingCoveragePercent = processingCoveragePercent,
+            IsPartial = isPartial,
             TopLevelItems = topLevelItems,
-            NotableFiles = notableFiles
+            NotableFiles = notableFiles,
+            Languages = languages,
+            SkipReasons = skipReasons
         };
     }
 
@@ -90,9 +139,29 @@ public static class RepositoryOverviewGenerator
         var normalizedPath = path.Replace('\\', '/');
         var fileName = normalizedPath.Split('/').Last();
 
-        if (fileName.StartsWith("readme", StringComparison.OrdinalIgnoreCase))
+        if (fileName.StartsWith("readme", StringComparison.OrdinalIgnoreCase)
+            || fileName.StartsWith("contributing", StringComparison.OrdinalIgnoreCase))
         {
-            return "README";
+            return "Documentation";
+        }
+
+        if (fileName.EndsWith(".sln", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Solution";
+        }
+
+        if (fileName.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith(".fsproj", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith(".vbproj", StringComparison.OrdinalIgnoreCase)
+            || fileName.Equals("package.json", StringComparison.OrdinalIgnoreCase)
+            || fileName.Equals("pyproject.toml", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Project definition";
+        }
+
+        if (normalizedPath.StartsWith(".github/workflows/", StringComparison.OrdinalIgnoreCase))
+        {
+            return "CI workflow";
         }
 
         if (ConfigFileNames.Any(name => string.Equals(fileName, name, StringComparison.OrdinalIgnoreCase)))
@@ -103,6 +172,19 @@ public static class RepositoryOverviewGenerator
         if (EntryPointFileNames.Any(name => string.Equals(fileName, name, StringComparison.OrdinalIgnoreCase)))
         {
             return "Entry point";
+        }
+
+        if (normalizedPath.Contains("/tests/", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.StartsWith("tests/", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Tests";
+        }
+
+        if (normalizedPath.Contains("/controllers/", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Contains("/endpoints/", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Contains("/api/", StringComparison.OrdinalIgnoreCase))
+        {
+            return "API surface";
         }
 
         if (normalizedPath.Contains("/services/", StringComparison.OrdinalIgnoreCase)

@@ -1,6 +1,7 @@
 @page "/repo-overview"
 @rendermode InteractiveServer
 @inject IRepositoryIndexingStatusStore IndexingStatusStore
+@inject IRepositoryOverviewAiService RepositoryOverviewAiService
 
 <PageTitle>Repo Overview — onboard-me</PageTitle>
 
@@ -39,6 +40,100 @@
 
         <p>@selectedOverview.Summary</p>
 
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="border rounded p-3 h-100">
+                    <div class="text-muted small">Tracked files</div>
+                    <div class="h4 mb-0">@selectedOverview.TrackedFileCount</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="border rounded p-3 h-100">
+                    <div class="text-muted small">Indexed</div>
+                    <div class="h4 mb-0">@selectedOverview.IndexedFileCount</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="border rounded p-3 h-100">
+                    <div class="text-muted small">Skipped</div>
+                    <div class="h4 mb-0">@selectedOverview.SkippedFileCount</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="border rounded p-3 h-100">
+                    <div class="text-muted small">Failed</div>
+                    <div class="h4 mb-0">@selectedOverview.FailedFileCount</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <strong>Processing coverage</strong>
+                <span>@selectedOverview.ProcessingCoveragePercent.ToString("0.0")%</span>
+            </div>
+            <div class="progress" role="progressbar" aria-label="Processing coverage"
+                 aria-valuenow="@selectedOverview.ProcessingCoveragePercent" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar @(selectedOverview.IsPartial ? "bg-warning" : "bg-success")"
+                     style="width: @($"{Math.Clamp(selectedOverview.ProcessingCoveragePercent, 0, 100):0.0}%")"></div>
+            </div>
+            @if (selectedOverview.IsPartial)
+            {
+                <p class="text-muted mt-2 mb-0">Overview may be partial because ingestion is incomplete or had failures.</p>
+            }
+        </div>
+
+        <h2 class="h4 mt-4">Architecture summary</h2>
+        @if (isAiSummaryLoading)
+        {
+            <p class="text-muted">Generating summary…</p>
+        }
+        else if (selectedAiSummary is not null)
+        {
+            <p>@selectedAiSummary.Narrative</p>
+
+            @if (!selectedAiSummary.IsAiGenerated && !string.IsNullOrWhiteSpace(selectedAiSummary.FallbackReason))
+            {
+                <p class="text-muted">Fallback: @selectedAiSummary.FallbackReason</p>
+            }
+
+            @if (selectedAiSummary.MainWorkflows.Count > 0)
+            {
+                <h3 class="h5">Main workflows</h3>
+                <ul>
+                    @foreach (var workflow in selectedAiSummary.MainWorkflows)
+                    {
+                        <li>@workflow</li>
+                    }
+                </ul>
+            }
+
+            @if (selectedAiSummary.EntryPoints.Count > 0)
+            {
+                <h3 class="h5">Entry points</h3>
+                <ul class="list-group mb-3">
+                    @foreach (var entryPoint in selectedAiSummary.EntryPoints)
+                    {
+                        <li class="list-group-item">
+                            <code>@entryPoint.Path</code>
+                            <div class="text-muted">@entryPoint.WhyItMatters</div>
+                        </li>
+                    }
+                </ul>
+            }
+
+            @if (selectedAiSummary.RisksAndUnknowns.Count > 0)
+            {
+                <h3 class="h5">Risks and unknowns</h3>
+                <ul>
+                    @foreach (var risk in selectedAiSummary.RisksAndUnknowns)
+                    {
+                        <li>@risk</li>
+                    }
+                </ul>
+            }
+        }
+
         <h2 class="h4 mt-4">Top-level structure</h2>
         <ul class="list-group mb-4">
             @foreach (var item in selectedOverview.TopLevelItems)
@@ -67,15 +162,58 @@
                 }
             </ul>
         }
+
+        <div class="row g-4 mt-1">
+            <div class="col-12 col-lg-6">
+                <h2 class="h4">Languages</h2>
+                @if (selectedOverview.Languages.Count == 0)
+                {
+                    <p class="text-muted">No language breakdown available.</p>
+                }
+                else
+                {
+                    <ul class="list-group">
+                        @foreach (var language in selectedOverview.Languages)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>@language.Language</span>
+                                <span class="badge text-bg-light">@language.FileCount</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+            <div class="col-12 col-lg-6">
+                <h2 class="h4">Skipped file reasons</h2>
+                @if (selectedOverview.SkipReasons.Count == 0)
+                {
+                    <p class="text-muted">No skipped files.</p>
+                }
+                else
+                {
+                    <ul class="list-group">
+                        @foreach (var skipReason in selectedOverview.SkipReasons)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <code>@skipReason.SkipReason</code>
+                                <span class="badge text-bg-light">@skipReason.FileCount</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
     }
 </div>
 
 @code {
     private bool hasLoadedState;
+    private bool isAiSummaryLoading;
     private string selectedOwner = string.Empty;
     private string selectedRepository = string.Empty;
     private IReadOnlyList<RepositoryIndexingStatus> indexedRepos = [];
     private RepositoryOverviewSnapshot? selectedOverview;
+    private RepositoryOverviewAiSummary? selectedAiSummary;
 
     protected override async Task OnInitializedAsync()
     {
@@ -92,13 +230,13 @@
                 .First();
             selectedOwner = latest.Owner;
             selectedRepository = latest.Repository;
-            selectedOverview = RepositoryOverviewGenerator.Create(latest);
+            await LoadSelectedRepoOverviewAsync(latest);
         }
 
         hasLoadedState = true;
     }
 
-    private void OnRepoSelectionChanged(ChangeEventArgs e)
+    private async Task OnRepoSelectionChanged(ChangeEventArgs e)
     {
         var value = e.Value?.ToString() ?? string.Empty;
         var slash = value.IndexOf('/');
@@ -118,6 +256,26 @@
             return;
         }
 
+        await LoadSelectedRepoOverviewAsync(status);
+    }
+
+    private async Task LoadSelectedRepoOverviewAsync(RepositoryIndexingStatus status)
+    {
         selectedOverview = RepositoryOverviewGenerator.Create(status);
+        isAiSummaryLoading = true;
+        selectedAiSummary = null;
+
+        try
+        {
+            selectedAiSummary = await RepositoryOverviewAiService.GenerateAsync(status);
+        }
+        catch
+        {
+            selectedAiSummary = null;
+        }
+        finally
+        {
+            isAiSummaryLoading = false;
+        }
     }
 }
