@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Fly tying channel icon</title>
+  <desc id="description">A simple hand-tied fishing fly inside a warm cream and forest-green badge.</desc>
+  <rect width="1024" height="1024" rx="220" fill="#163a34"/>
+  <circle cx="512" cy="512" r="418" fill="#e9b65f"/>
+  <circle cx="512" cy="512" r="395" fill="#f3eedf"/>
+  <circle cx="512" cy="512" r="367" fill="none" stroke="#d8d1bd" stroke-width="3"/>
+
+  <g transform="rotate(-24 512 512)" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M383 532c-85-50-150-70-225-69 69 24 126 57 202 103-83-19-148-17-220 9 78-3 149 8 219 34-60 12-106 37-155 77 68-28 131-39 202-42" fill="#d87945"/>
+    <path d="M201 467c56 34 107 67 158 111m-219-3c72-1 135 5 211 27m-136 86c46-21 91-35 152-43" fill="none" stroke="#f4c278" stroke-width="8"/>
+
+    <path d="M362 507c88-25 190-33 291-11l-9 94c-102-20-193-14-283 9z" fill="#bd6840" stroke="#173d37" stroke-width="14"/>
+    <path d="M380 511c54 15 102 35 154 68m-90-73c55 14 103 34 155 66m-90-71c51 13 96 31 146 62" fill="none" stroke="#e9b65f" stroke-width="13"/>
+    <path d="M408 506c39-43 92-66 151-62 38 3 73 21 104 48-55 22-111 34-173 33-33-1-61-6-82-19z" fill="#e9b65f" stroke="#173d37" stroke-width="13"/>
+    <path d="M470 468c54-5 118 8 176 32-52 10-103 10-148-1-31-7-55-15-79-28" fill="none" stroke="#fff9e9" stroke-width="11"/>
+
+    <path d="M644 524c93-20 177-12 222 29 48 43 40 122-13 166-48 40-114 27-133-18-11-26-4-51 18-68" fill="none" stroke="#173d37" stroke-width="24"/>
+    <path d="m735 631 42-9-24 38" fill="#173d37"/>
+    <path d="M652 521c-10-47 8-83 43-87 34-4 54 28 46 63-7 32-38 51-89 61" fill="#d87945" stroke="#173d37" stroke-width="14"/>
+    <path d="M666 480c16-16 36-19 53-10" fill="none" stroke="#fff9e9" stroke-width="9"/>
+    <path d="M674 441c-11-59-5-101 22-148 20 52 24 99 12 149m28 3c22-54 52-87 101-114-17 55-47 94-94 127" fill="#d87945" stroke="#173d37" stroke-width="12"/>
+    <path d="M694 417c-3-38-1-72 7-103m45 102c19-33 42-59 70-79" fill="none" stroke="#f4c278" stroke-width="8"/>
+  </g>
+</svg>
