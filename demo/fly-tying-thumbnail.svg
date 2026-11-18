@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title description">
+  <title id="title">Amateur Fly Tying YouTube thumbnail</title>
+  <desc id="description">A bold outdoor-inspired thumbnail with a hand-tied fishing fly and the words Amateur Fly Tying.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#102c2b"/>
+      <stop offset=".58" stop-color="#1b4741"/>
+      <stop offset="1" stop-color="#102a2a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx=".71" cy=".43" r=".55">
+      <stop offset="0" stop-color="#d49448" stop-opacity=".46"/>
+      <stop offset="1" stop-color="#d49448" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="feather" x1="0" y1="1" x2="1" y2="0">
+      <stop stop-color="#a9422d"/>
+      <stop offset=".48" stop-color="#e17b3d"/>
+      <stop offset="1" stop-color="#f2bc68"/>
+    </linearGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#f3bd69"/>
+      <stop offset=".5" stop-color="#9b5635"/>
+      <stop offset="1" stop-color="#51372d"/>
+    </linearGradient>
+    <pattern id="grain" width="82" height="82" patternUnits="userSpaceOnUse">
+      <circle cx="7" cy="12" r="1" fill="#fff" opacity=".12"/>
+      <circle cx="48" cy="57" r="1.2" fill="#fff" opacity=".1"/>
+      <circle cx="71" cy="26" r=".8" fill="#fff" opacity=".11"/>
+    </pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="13"/>
+      <feOffset dy="9"/>
+      <feComponentTransfer><feFuncA type="linear" slope=".28"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="720" fill="url(#background)"/>
+  <rect width="1280" height="720" fill="url(#glow)"/>
+  <path d="M0 530C204 474 348 578 520 520s273-74 410-15 225 48 350-16v231H0Z" fill="#0d2828" opacity=".58"/>
+  <path d="M0 599c202-66 331-18 493 7s280-30 445-12 251 62 342 5" fill="none" stroke="#76a18c" stroke-width="3" opacity=".22"/>
+  <path d="M0 635c178-42 308 10 462 20s294-32 457-14 239 34 361 8" fill="none" stroke="#a9c5a5" stroke-width="2" opacity=".16"/>
+  <rect width="1280" height="720" fill="url(#grain)"/>
+
+  <g opacity=".18" fill="#d9c596">
+    <path d="M1010 0h8v194h-8zM1063 0h5v142h-5zM1118 0h7v171h-7zM1184 0h5v126h-5z"/>
+    <path d="M991 192h49v4h-49zM1046 140h39v4h-39zM1103 169h45v4h-45zM1169 124h38v4h-38z"/>
+  </g>
+
+  <g font-family="Arial, Helvetica, sans-serif">
+    <rect x="76" y="88" width="290" height="48" rx="24" fill="#e9b55e"/>
+    <circle cx="103" cy="112" r="6" fill="#183832"/>
+    <text x="122" y="120" fill="#183832" font-size="18" font-weight="700" letter-spacing="3">ON THE VISE</text>
+
+    <text x="72" y="275" fill="#f3f0e2" font-size="82" font-weight="900" letter-spacing="-2">AMATEUR</text>
+    <text x="72" y="366" fill="#f3f0e2" font-size="82" font-weight="900" letter-spacing="-2">FLY TYING</text>
+    <path d="M77 405h305" stroke="#e9b55e" stroke-width="7" stroke-linecap="round"/>
+    <text x="78" y="458" fill="#d7e0d1" font-size="26" font-weight="500" letter-spacing=".5">Simple patterns. Real fish.</text>
+    <g transform="translate(78 515)">
+      <circle cx="12" cy="12" r="12" fill="#e9b55e"/>
+      <path d="m7 12 4 4 7-9" fill="none" stroke="#183832" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="36" y="20" fill="#d7e0d1" font-size="18" font-weight="700" letter-spacing="2">LEARN AS YOU GO</text>
+    </g>
+  </g>
+
+  <g transform="rotate(-12 930 370)" filter="url(#shadow)">
+    <ellipse cx="932" cy="421" rx="202" ry="35" fill="#0c2524" opacity=".32"/>
+
+    <path d="M775 342c-59-45-111-85-184-102 59 42 100 89 152 125-65-31-121-41-183-35 77 17 130 45 189 53-61 7-113 31-162 67 72-29 129-36 185-31" fill="url(#feather)" stroke="#f0aa61" stroke-width="2"/>
+    <path d="M590 241c62 43 118 92 183 142M564 331c73 5 143 26 205 48M588 450c55-33 113-53 186-60" fill="none" stroke="#f1c47b" stroke-width="2" opacity=".64"/>
+    <path d="M768 361c-54-16-100-38-149-71M771 371c-62-4-115-16-177-30M769 381c-57 8-106 25-157 44" fill="none" stroke="#7d342a" stroke-width="4" opacity=".75"/>
+
+    <path d="M770 368c54-9 111-8 168-4 60 4 105 22 130 60" fill="none" stroke="#d7ded0" stroke-width="7" stroke-linecap="round"/>
+    <path d="M1068 424c10 65-42 108-102 102-49-5-71-41-57-79 7-19 20-31 38-41" fill="none" stroke="#d7ded0" stroke-width="7" stroke-linecap="round"/>
+    <path d="m947 406-10 38 26-23" fill="#d7ded0"/>
+
+    <path d="M770 359c68-10 135-7 196 0l-3 43c-67-9-132-7-196 6z" fill="url(#body)" stroke="#e6b56c" stroke-width="2"/>
+    <path d="M778 360c40 15 74 31 112 44m-79-47c41 16 75 31 114 44m-80-46c39 15 73 30 111 42m-77-44c39 14 71 28 107 40" fill="none" stroke="#f4d296" stroke-width="3" opacity=".85"/>
+    <path d="M787 358c29-20 66-29 105-22 26 5 49 17 69 29-34 16-75 24-117 21-23-1-43-9-57-28z" fill="#c6a85e" stroke="#eed28b" stroke-width="2"/>
+    <path d="M852 344c34 1 77 12 112 28-33 4-68 1-98-9-19-7-33-13-48-18" fill="none" stroke="#f3e5b3" stroke-width="5" stroke-linecap="round"/>
+    <ellipse cx="975" cy="379" rx="25" ry="31" fill="#d65e37" stroke="#f4c078" stroke-width="4"/>
+    <path d="M965 354c-19-29-35-43-59-51 9 25 22 43 43 60m35-31c9-30 23-49 46-66-1 29-10 53-32 75" fill="url(#feather)" stroke="#f0aa61" stroke-width="2"/>
+    <path d="M966 356c-13-19-29-33-49-43m86 17c7-21 17-38 34-52" fill="none" stroke="#f7cf8e" stroke-width="2" opacity=".8"/>
+    <path d="M957 380c13-12 28-14 40-3" fill="none" stroke="#fff0bd" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <g transform="translate(1095 563)" font-family="Arial, Helvetica, sans-serif">
+    <rect width="112" height="44" rx="22" fill="#f3f0e2" opacity=".94"/>
+    <text x="56" y="29" text-anchor="middle" fill="#183832" font-size="16" font-weight="800" letter-spacing="1.5">DIY • FLY</text>
+  </g>
+</svg>
